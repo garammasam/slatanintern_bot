@@ -1,0 +1,24 @@
+{
+  "name": "telegram-bot",
+  "version": "1.0.0",
+  "description": "A Telegram group chat bot powered by GPT-4",
+  "main": "dist/telegram-bot.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/telegram-bot.js",
+    "dev": "ts-node telegram-bot.ts"
+  },
+  "dependencies": {
+    "grammy": "^1.21.1",
+    "openai": "^4.24.1",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+} 
