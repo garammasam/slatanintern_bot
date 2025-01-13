@@ -128,18 +128,6 @@ class GroupChatBot {
   private groupLastResponse: Map<string, number> = new Map();
   private readonly GROUP_COOLDOWN = 10000; // 10 seconds cooldown per group
   private kickPolls: Map<string, PollInfo> = new Map();
-  private morningQuotes: Quote[] = [
-    { text: "Setiap hari adalah peluang baru untuk jadi lebih baik", author: "SLATAN" },
-    { text: "Buat apa yang kau suka, suka apa yang kau buat", author: "SLATAN" },
-    { text: "Kalau tak cuba, macam mana nak tau", author: "SLATAN" },
-    { text: "Jangan tunggu sempurna, just start je dulu", author: "SLATAN" },
-    { text: "Yang penting progress, tak kisah slow ke fast", author: "SLATAN" },
-    { text: "Kita semua ada timing sendiri", author: "SLATAN" },
-    { text: "Buat je dulu, edit kemudian", author: "SLATAN" },
-    { text: "Tak semua orang akan faham journey kita", author: "SLATAN" },
-    { text: "Kadang kala kita perlu reset untuk grow", author: "SLATAN" },
-    { text: "Jangan compare journey sendiri dengan orang lain", author: "SLATAN" }
-  ];
   
   constructor(config: BotConfig) {
     this.bot = new Bot(config.telegramToken);
@@ -150,6 +138,7 @@ class GroupChatBot {
     this.setupErrorHandling();
     this.setupHandlers();
     this.setupMorningGreeting();
+    this.setupNightGreeting();
   }
   
   private setupErrorHandling() {
@@ -981,12 +970,48 @@ class GroupChatBot {
     }
   }
 
-  private setupMorningGreeting() {
+  private async generateDailyQuote(type: 'morning' | 'night'): Promise<Quote> {
+    try {
+      const prompt = type === 'morning' 
+        ? "Generate a motivational quote in Malay (mix with some English words) about starting the day, hustling, and chasing dreams. The quote should be in SLATAN's style - street smart, music-focused, and inspiring for young artists. Keep it under 15 words."
+        : "Generate a reflective quote in Malay (mix with some English words) about resting, recharging, and preparing for tomorrow's grind. The quote should be in SLATAN's style - street smart, music-focused, and inspiring for young artists. Keep it under 15 words.";
+
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini-2024-07-18",
+        messages: [
+          {
+            role: "system",
+            content: "You are SLATAN, a Malaysian music collective known for street-smart wisdom and inspiring young artists. Generate a quote that reflects your style - mixing Malay and English naturally, using music metaphors, and keeping it real."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.9,
+        max_tokens: 100
+      });
+
+      const quote = completion.choices[0].message.content?.trim() || '';
+      return {
+        text: quote,
+        author: "SLATAN"
+      };
+    } catch (error) {
+      console.error(`Error generating ${type} quote:`, error);
+      // Fallback quotes if API fails
+      return type === 'morning'
+        ? { text: "Every day is a new track waiting to be made", author: "SLATAN" }
+        : { text: "Rest up and recharge for tomorrow's session", author: "SLATAN" };
+    }
+  }
+
+  private async setupMorningGreeting() {
     // Schedule job for 8 AM Malaysia time (UTC+8)
     scheduleJob('0 8 * * *', async () => {
       try {
         console.log('Sending morning greeting...');
-        const quote = this.getRandomQuote();
+        const quote = await this.generateDailyQuote('morning');
         const greeting = this.formatMorningGreeting(quote);
 
         // Send to all configured groups
@@ -1007,13 +1032,9 @@ class GroupChatBot {
     });
   }
 
-  private getRandomQuote(): Quote {
-    return this.morningQuotes[Math.floor(Math.random() * this.morningQuotes.length)];
-  }
-
   private formatMorningGreeting(quote: Quote): string {
     const greetings = [
-      "SELAMAT PAGI GANG! 🌅",
+      "SELAMAT PAGI GANG! 🌞",
       "PAGI PAGI DAH NAK BUAT KERJA! ⭐️",
       "YO GANG DAAAAH BANGUN? 🌞",
       "RISE AND SHINE GANG! 🌄"
@@ -1022,6 +1043,45 @@ class GroupChatBot {
     const greeting = greetings[Math.floor(Math.random() * greetings.length)];
 
     return `${greeting}\n\nQuote of the day:\n\n"${quote.text}"\n- ${quote.author}\n\nLet's get this bread gang! 💪 Semoga hari ni productive gila! 🔥`;
+  }
+
+  private async setupNightGreeting() {
+    // Schedule job for 11 PM Malaysia time (UTC+8)
+    scheduleJob('0 23 * * *', async () => {
+      try {
+        console.log('Sending night greeting...');
+        const quote = await this.generateDailyQuote('night');
+        const greeting = this.formatNightGreeting(quote);
+
+        // Send to all configured groups
+        for (const groupId of this.config.groupIds) {
+          try {
+            await this.bot.api.sendMessage(groupId, greeting, {
+              parse_mode: 'MarkdownV2',
+              disable_web_page_preview: true
+            } as any);
+            console.log(`Night greeting sent to group ${groupId}`);
+          } catch (error) {
+            console.error(`Error sending night greeting to group ${groupId}:`, error);
+          }
+        }
+      } catch (error) {
+        console.error('Error in night greeting scheduler:', error);
+      }
+    });
+  }
+
+  private formatNightGreeting(quote: Quote): string {
+    const greetings = [
+      "SELAMAT MALAM GANG! 🌙",
+      "TIME TO REST GANG! 💤",
+      "YO GANG DAH NAK TIDUR KE? 😴",
+      "SWEET DREAMS GANG! ✨"
+    ];
+
+    const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+
+    return `${greeting}\n\nQuote of the night:\n\n"${quote.text}"\n- ${quote.author}\n\nGet some rest gang! 💫 Esok kita grind balik! 🔥`;
   }
 
   public async start() {
