@@ -829,12 +829,7 @@ class GroupChatBot {
                      - Excited moments: More Kelantanese
                      - Professional topics: Standard Malay/English
                      
-                     Kelantanese Moments (Use when excited/emotional):
-                     - "Weh gile power!" (super amazing)
-                     - "Demo jom!" (let's go friends)
-                     - "Mbo suke gile!" (I really like this)
-                     - "Dok payah risau!" (don't worry)
-                     - "Gapo ni?" (what's this?)
+              
                      
                      Modern Slang (Mix naturally):
                      - "fr fr" (for real)
