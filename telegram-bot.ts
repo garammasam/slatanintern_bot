@@ -269,8 +269,7 @@ class GroupChatBot {
           {
             is_anonymous: false,
             allows_multiple_answers: false,
-            open_period: 300, // 5 minutes
-            close_date: Math.floor(Date.now() / 1000) + 300
+            open_period: 300 // 5 minutes
           }
         );
 
@@ -284,6 +283,53 @@ class GroupChatBot {
           userId: userToKick,
           pollId: poll.poll.id
         });
+
+        // Set a timer to process the poll results after 5 minutes
+        setTimeout(async () => {
+          try {
+            console.log('Poll timer expired, processing results...');
+            // Get the latest poll results
+            const message = await ctx.api.stopPoll(ctx.chat.id, poll.message_id);
+            
+            const totalVotes = message.total_voter_count;
+            const kickVotes = message.options[0].voter_count; // First option is "Kick"
+
+            console.log('Processing poll results:', {
+              totalVotes,
+              kickVotes,
+              options: message.options
+            });
+
+            // If more than 50% voted to kick
+            if (totalVotes > 0 && kickVotes > totalVotes / 2) {
+              try {
+                console.log('Attempting to kick user:', userToKick);
+                
+                // First try to kick
+                await ctx.api.banChatMember(ctx.chat.id, userToKick, {
+                  until_date: Math.floor(Date.now() / 1000) + 60 // Ban for 1 minute
+                });
+                
+                // Then unban to allow them to rejoin
+                await ctx.api.unbanChatMember(ctx.chat.id, userToKick);
+                
+                await ctx.api.sendMessage(ctx.chat.id, `User dah kena kick sebab ramai vote ✅ (${kickVotes}/${totalVotes} votes)`);
+                console.log('User kicked successfully');
+              } catch (error) {
+                console.error('Error kicking user:', error);
+                await ctx.api.sendMessage(ctx.chat.id, 'Eh sori, tak dapat nak kick 😅 Check bot permissions k?');
+              }
+            } else {
+              console.log('Not enough votes to kick');
+              await ctx.api.sendMessage(ctx.chat.id, `Tak cukup votes untuk kick 🤷‍♂️ (${kickVotes}/${totalVotes} votes)`);
+            }
+
+            // Remove poll from tracking
+            this.kickPolls.delete(ctx.chat.id.toString());
+          } catch (error) {
+            console.error('Error processing poll results:', error);
+          }
+        }, 300000); // 5 minutes in milliseconds
 
       } catch (error) {
         console.error('Error in kick command:', error);
