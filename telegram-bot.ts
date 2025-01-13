@@ -627,12 +627,12 @@ class GroupChatBot {
   }
 
   private escapeMarkdown(text: string): string {
-    // First escape special regex characters
     return text
       .replace(/([_*\[\]()~`>#\+\-=|{}.!\\])/g, '\\$1') // Escape MarkdownV2 special characters
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+      .replace(/>/g, '&gt;')
+      .replace(/https?:\/\//g, ''); // Remove http/https protocols from URLs
   }
 
   private async enrichResponseContext(groupId: string): Promise<any[]> {
@@ -1246,10 +1246,10 @@ class GroupChatBot {
 
   private handleMerchInquiry(): string {
     const responses = [
-      "YO GANG! 🔥 Cop official SLATAN merch at @dataran.online on IG or https://dataran.online! Support local scene! 💯",
-      "AYOOO check out @dataran.online on IG or https://dataran.online for official merch gang! 🛍️ Drip too hard fr fr! 🔥",
-      "GANG GANG! Official SLATAN merch at @dataran.online (IG) or https://dataran.online! Cop before sold out! 🔥",
-      "YO BRO! Looking for SLATAN drip? @dataran.online on IG or https://dataran.online is the only official store! Get yours now! 💯"
+      "Yo gang! 🔥 Cop official SLATAN merch at @dataran\\.online on IG or dataran\\.online! Support local scene! 💯",
+      "Ayoo check out @dataran\\.online on IG or dataran\\.online for official merch gang! 🛍️ Drip too hard fr fr! 🔥",
+      "Gang gang! Official SLATAN merch at @dataran\\.online \\(IG\\) or dataran\\.online! Cop before sold out! 🔥",
+      "Yo bro! Looking for SLATAN drip? @dataran\\.online on IG or dataran\\.online is the only official store! Get yours now! 💯"
     ];
     
     return responses[Math.floor(Math.random() * responses.length)];
