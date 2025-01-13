@@ -888,33 +888,32 @@ class GroupChatBot {
 
   private async handleArtistInquiry(query: string): Promise<string> {
     try {
-      // Use the existing searchArtistInfo function to get data
       const { catalogs, shows, projects } = await this.searchArtistInfo(query);
 
       // Format response with markdown escaping
-      let response = `Yo gang\\! Here's what I found about ${this.escapeMarkdown(query)}:\\n\\n`;
+      let response = `Wasup gang\\! Ni info ${this.escapeMarkdown(query)} yg aku jumpa:\\n\\n`;
       
       if (catalogs?.length) {
-        response += `🎵 *Releases* \\(${catalogs.length}\\):\\n`;
+        response += `🎵 *Releases* \\(${catalogs.length} tracks\\):\\n`;
         catalogs.slice(0, 5).forEach(track => {
           const title = this.escapeMarkdown(track.title);
           const date = this.escapeMarkdown(track.release_date || '');
           const duration = this.escapeMarkdown(track.duration || '');
           response += `\\- ${title} \\(${date}\\) \\- ${duration}\\n`;
         });
-        if (catalogs.length > 5) response += `_\\.\\.\\.and ${catalogs.length - 5} more releases_\\n`;
+        if (catalogs.length > 5) response += `_\\.\\.\\. \\+ ${catalogs.length - 5} more tracks_\\n`;
         response += '\\n';
       }
 
       if (shows?.length) {
-        response += `🎪 *Upcoming Shows* \\(${shows.length}\\):\\n`;
+        response += `🎪 *Shows* \\(${shows.length}\\):\\n`;
         shows.slice(0, 3).forEach(show => {
           const title = this.escapeMarkdown(show.title);
           const venue = this.escapeMarkdown(show.venue);
           const date = this.escapeMarkdown(show.date);
-          response += `\\- ${title} at ${venue} \\(${date}\\)\\n`;
+          response += `\\- ${title} kt ${venue} \\(${date}\\)\\n`;
         });
-        if (shows.length > 3) response += `_\\.\\.\\.and ${shows.length - 3} more shows_\\n`;
+        if (shows.length > 3) response += `_\\.\\.\\. \\+ ${shows.length - 3} more shows otw_\\n`;
         response += '\\n';
       }
 
@@ -945,22 +944,37 @@ class GroupChatBot {
                 .filter((f: string) => f.toLowerCase() !== query.toLowerCase())
                 .map((f: string) => this.escapeMarkdown(f))
                 .join(', ');
-              response += `  \\• ${trackTitle} \\(${trackStatus}\\) feat\\. ${features}\\n`;
+              
+              // Convert status to street style
+              const streetStatus = trackStatus === 'mixing' ? 'otw mix' : 
+                                 trackStatus === 'recording' ? 'otw record' :
+                                 trackStatus === 'mastering' ? 'otw master' : 
+                                 'writing';
+              
+              response += `  \\• ${trackTitle} \\(${streetStatus}\\) ft\\. ${features}\\n`;
             });
           }
         });
-        if (projects.length > 3) response += `_\\.\\.\\.and ${projects.length - 3} more projects_\\n`;
+        if (projects.length > 3) response += `_\\.\\.\\. \\+ ${projects.length - 3} more projects otw_\\n`;
       }
 
       if (!catalogs?.length && !shows?.length && !projects?.length) {
-        return `Yo bro\\, couldn't find anything about "${this.escapeMarkdown(query)}" in the database\\. Hit me up when they drop something new\\!`;
+        return `Eh bro\\, xde la pulak info pasal "${this.escapeMarkdown(query)}" dalam database ni\\. Nanti kalau ada update aku bagitau k\\!`;
       }
 
-      response += `\\nStay locked in for more updates gang\\! 🔥`;
+      // Add random closing messages
+      const closings = [
+        "\\nStay tune gang\\! More 🔥 otw\\!",
+        "\\nTggu je updates baru gang\\! 💯",
+        "\\nNanti ada update baru aku bagitau k\\! 🔥",
+        "\\nKeep supporting local scene gang\\! 🙌"
+      ];
+      response += closings[Math.floor(Math.random() * closings.length)];
+      
       return response;
     } catch (error) {
       console.error('Error in artist inquiry:', error);
-      return 'My bad gang\\, something went wrong\\. Try again later\\.';
+      return 'Alamak gang\\, ada error ni\\. Cuba lagi sekali k\\!';
     }
   }
 
