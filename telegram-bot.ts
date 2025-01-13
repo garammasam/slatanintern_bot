@@ -60,6 +60,11 @@ interface CatalogTrack {
   type: string;
 }
 
+interface MerchKeyword {
+  words: string[];
+  regex: RegExp;
+}
+
 // Create a simple HTTP server for health checks
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -128,6 +133,10 @@ class GroupChatBot {
   private groupLastResponse: Map<string, number> = new Map();
   private readonly GROUP_COOLDOWN = 10000; // 10 seconds cooldown per group
   private kickPolls: Map<string, PollInfo> = new Map();
+  private merchKeywords: MerchKeyword = {
+    words: ['merch', 'merchandise', 'baju', 'tshirt', 't-shirt', 'tee', 'hoodie', 'cap', 'snapback', 'bundle'],
+    regex: /\b(merch|merchandise|baju|tshirt|t-shirt|tee|hoodie|cap|snapback|bundle)\b/i
+  };
   
   constructor(config: BotConfig) {
     this.bot = new Bot(config.telegramToken);
@@ -488,6 +497,15 @@ class GroupChatBot {
           parse_mode: 'MarkdownV2',
           disable_web_page_preview: true 
         } as any);
+        return;
+      }
+    }
+
+    // Check if message is asking about merchandise
+    if (messageTextLower.includes('slatan') || messageTextLower.includes('0108')) {
+      if (this.merchKeywords.regex.test(messageTextLower)) {
+        const merchResponse = this.handleMerchInquiry();
+        await ctx.reply(merchResponse);
         return;
       }
     }
@@ -1203,6 +1221,17 @@ class GroupChatBot {
       }
       this.kickPolls.delete(ctx.chat.id.toString());
     }
+  }
+
+  private handleMerchInquiry(): string {
+    const responses = [
+      "YO GANG! 🔥 Nak cop merch SLATAN? Head over to https://dataran.online fr fr! Support local scene! 💯",
+      "AYOOO check out our official merch at https://dataran.online gang! 🛍️ Drip too hard fr fr! 🔥",
+      "GANG GANG! All official SLATAN merch available at https://dataran.online! Cop before sold out! 🔥",
+      "YO BRO! Looking for SLATAN drip? https://dataran.online is the only official store! Get yours now! 💯"
+    ];
+    
+    return responses[Math.floor(Math.random() * responses.length)];
   }
 }
 
