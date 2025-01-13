@@ -127,6 +127,12 @@ interface ProjectTrack {
   recordingLocation?: string;
 }
 
+interface TrackInfo {
+  title: string;
+  status: string;
+  features: string[];
+}
+
 class GroupChatBot {
   private bot: Bot;
   private openai: OpenAI;
@@ -814,22 +820,22 @@ class GroupChatBot {
       // Normalize the artist query for case-insensitive search
       const normalizedQuery = artistQuery.toLowerCase().trim();
       
-      // Search catalogs
+      // Search catalogs - using case-insensitive array contains
       const { data: catalogs, error: catalogError } = await supabase
         .from('catalogs')
         .select()
-        .contains('artist', [normalizedQuery])
+        .filter('artist', 'cs', `{${normalizedQuery}}`)  // Case-sensitive array contains
         .order('release_date', { ascending: false });
 
       if (catalogError) {
         console.error('Error searching catalogs:', catalogError);
       }
 
-      // Search shows
+      // Search shows - using case-insensitive array contains
       const { data: shows, error: showError } = await supabase
         .from('shows')
         .select()
-        .contains('artists', [normalizedQuery])
+        .filter('artists', 'cs', `{${normalizedQuery}}`)  // Case-sensitive array contains
         .eq('status', 'upcoming')
         .order('date', { ascending: true });
 
@@ -861,6 +867,10 @@ class GroupChatBot {
         return isMainArtist || isCollaborator || isFeatureArtist;
       });
 
+      console.log(`Found catalogs: ${catalogs?.length || 0}`);
+      console.log(`Found shows: ${shows?.length || 0}`);
+      console.log(`Found projects: ${projects?.length || 0}`);
+
       return {
         catalogs: catalogs || [],
         shows: shows || [],
@@ -888,15 +898,16 @@ class GroupChatBot {
         response += `🎵 *Releases* \\(${catalogs.length}\\):\\n`;
         catalogs.slice(0, 5).forEach(track => {
           const title = this.escapeMarkdown(track.title);
-          const date = this.escapeMarkdown(track.release_date);
-          response += `\\- ${title} \\(${date}\\)\\n`;
+          const date = this.escapeMarkdown(track.release_date || '');
+          const duration = this.escapeMarkdown(track.duration || '');
+          response += `\\- ${title} \\(${date}\\) \\- ${duration}\\n`;
         });
         if (catalogs.length > 5) response += `_\\.\\.\\.and ${catalogs.length - 5} more releases_\\n`;
         response += '\\n';
       }
 
       if (shows?.length) {
-        response += `🎪 *Shows* \\(${shows.length}\\):\\n`;
+        response += `🎪 *Upcoming Shows* \\(${shows.length}\\):\\n`;
         shows.slice(0, 3).forEach(show => {
           const title = this.escapeMarkdown(show.title);
           const venue = this.escapeMarkdown(show.venue);
@@ -919,11 +930,23 @@ class GroupChatBot {
             .filter((track: ProjectTrack) => 
               track.features?.some((f: string) => f.toLowerCase() === query.toLowerCase())
             )
-            .map((track: ProjectTrack) => track.title);
+            .map((track: ProjectTrack) => ({
+              title: track.title,
+              status: track.status,
+              features: track.features
+            }));
           
           response += `\\- ${status} ${title} \\(${genre}\\)\\n`;
           if (featuredTracks.length) {
-            response += `  Featured in: ${featuredTracks.map((t: string) => this.escapeMarkdown(t)).join(', ')}\\n`;
+            featuredTracks.forEach((track: TrackInfo) => {
+              const trackTitle = this.escapeMarkdown(track.title);
+              const trackStatus = this.escapeMarkdown(track.status.toLowerCase());
+              const features = track.features
+                .filter((f: string) => f.toLowerCase() !== query.toLowerCase())
+                .map((f: string) => this.escapeMarkdown(f))
+                .join(', ');
+              response += `  \\• ${trackTitle} \\(${trackStatus}\\) feat\\. ${features}\\n`;
+            });
           }
         });
         if (projects.length > 3) response += `_\\.\\.\\.and ${projects.length - 3} more projects_\\n`;
