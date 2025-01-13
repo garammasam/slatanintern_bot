@@ -146,10 +146,21 @@ class GroupChatBot {
     this.bot.on('poll', async (ctx) => {
       try {
         const pollId = ctx.poll.id;
+        console.log('Poll update received:', {
+          pollId,
+          totalVotes: ctx.poll.total_voter_count,
+          options: ctx.poll.options,
+          isClosed: ctx.poll.is_closed
+        });
+
         const kickInfo = Array.from(this.kickPolls.entries()).find(([_, info]) => info.pollId === pollId);
         
-        if (!kickInfo) return;
+        if (!kickInfo) {
+          console.log('Not a kick poll, ignoring');
+          return;
+        }
 
+        console.log('Found kick poll info:', kickInfo);
         const [chatId, { userId }] = kickInfo;
         
         // Check if poll is closed
@@ -157,23 +168,42 @@ class GroupChatBot {
           const totalVotes = ctx.poll.total_voter_count;
           const kickVotes = ctx.poll.options[0].voter_count; // First option is "Kick"
           
+          console.log('Processing closed kick poll:', {
+            chatId,
+            userId,
+            totalVotes,
+            kickVotes,
+            options: ctx.poll.options
+          });
+
           // If more than 50% voted to kick
           if (totalVotes > 0 && kickVotes > totalVotes / 2) {
             try {
+              console.log('Attempting to kick user:', userId);
+              
+              // First try to kick
               await ctx.api.banChatMember(chatId, userId, {
-                until_date: Math.floor(Date.now() / 1000) + 60 // Ban for 1 minute (effectively a kick)
+                until_date: Math.floor(Date.now() / 1000) + 60 // Ban for 1 minute
               });
-              await ctx.api.sendMessage(chatId, `User dah kena kick sebab ramai vote ✅`);
+              
+              // Then unban to allow them to rejoin
+              await ctx.api.unbanChatMember(chatId, userId);
+              
+              await ctx.api.sendMessage(chatId, `User dah kena kick sebab ramai vote ✅ (${kickVotes}/${totalVotes} votes)`);
+              console.log('User kicked successfully');
             } catch (error) {
               console.error('Error kicking user:', error);
               await ctx.api.sendMessage(chatId, 'Eh sori, tak dapat nak kick 😅 Check bot permissions k?');
             }
           } else {
-            await ctx.api.sendMessage(chatId, `Tak cukup votes untuk kick 🤷‍♂️`);
+            console.log('Not enough votes to kick');
+            await ctx.api.sendMessage(chatId, `Tak cukup votes untuk kick 🤷‍♂️ (${kickVotes}/${totalVotes} votes)`);
           }
           
           // Remove poll from tracking
           this.kickPolls.delete(chatId);
+        } else {
+          console.log('Poll still open, waiting for more votes');
         }
       } catch (error) {
         console.error('Error handling poll answer:', error);
@@ -209,8 +239,28 @@ class GroupChatBot {
         }
 
         const userToKick = replyToMessage.from.id;
+        
+        // Check if trying to kick an admin
+        const targetMember = await ctx.api.getChatMember(ctx.chat.id, userToKick);
+        if (['administrator', 'creator'].includes(targetMember.status)) {
+          await ctx.reply('Eh tak boleh kick admin la bestie 😅');
+          return;
+        }
+
+        // Check if trying to kick the bot
+        if (userToKick === ctx.me.id) {
+          await ctx.reply('Eh jangan kick aku la bestie 🥺');
+          return;
+        }
+
         const username = replyToMessage.from.username || replyToMessage.from.first_name || 'user';
         
+        console.log('Creating kick poll for:', {
+          chatId: ctx.chat.id,
+          userId: userToKick,
+          username: username
+        });
+
         // Create a kick poll
         const poll = await ctx.api.sendPoll(
           ctx.chat.id,
@@ -223,6 +273,11 @@ class GroupChatBot {
             close_date: Math.floor(Date.now() / 1000) + 300
           }
         );
+
+        console.log('Kick poll created:', {
+          pollId: poll.poll.id,
+          options: poll.poll.options
+        });
 
         // Store poll information for later
         this.kickPolls.set(ctx.chat.id.toString(), {
