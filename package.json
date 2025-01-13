@@ -12,8 +12,10 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.47.12",
     "@types/node": "^20.10.6",
+    "@types/node-schedule": "^2.1.7",
     "dotenv": "^16.3.1",
     "grammy": "^1.21.1",
+    "node-schedule": "^2.1.1",
     "openai": "^4.24.1",
     "typescript": "^5.3.3"
   },

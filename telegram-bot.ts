@@ -3,6 +3,7 @@ import { OpenAI } from 'openai';
 import { config } from 'dotenv';
 import * as http from 'http';
 import { createClient } from '@supabase/supabase-js';
+import { scheduleJob } from 'node-schedule';
 
 // Load environment variables
 config();
@@ -111,6 +112,11 @@ interface TrackInfo {
   features: string[];
 }
 
+interface Quote {
+  text: string;
+  author: string;
+}
+
 class GroupChatBot {
   private bot: Bot;
   private openai: OpenAI;
@@ -122,6 +128,18 @@ class GroupChatBot {
   private groupLastResponse: Map<string, number> = new Map();
   private readonly GROUP_COOLDOWN = 10000; // 10 seconds cooldown per group
   private kickPolls: Map<string, PollInfo> = new Map();
+  private morningQuotes: Quote[] = [
+    { text: "Setiap hari adalah peluang baru untuk jadi lebih baik", author: "SLATAN" },
+    { text: "Buat apa yang kau suka, suka apa yang kau buat", author: "SLATAN" },
+    { text: "Kalau tak cuba, macam mana nak tau", author: "SLATAN" },
+    { text: "Jangan tunggu sempurna, just start je dulu", author: "SLATAN" },
+    { text: "Yang penting progress, tak kisah slow ke fast", author: "SLATAN" },
+    { text: "Kita semua ada timing sendiri", author: "SLATAN" },
+    { text: "Buat je dulu, edit kemudian", author: "SLATAN" },
+    { text: "Tak semua orang akan faham journey kita", author: "SLATAN" },
+    { text: "Kadang kala kita perlu reset untuk grow", author: "SLATAN" },
+    { text: "Jangan compare journey sendiri dengan orang lain", author: "SLATAN" }
+  ];
   
   constructor(config: BotConfig) {
     this.bot = new Bot(config.telegramToken);
@@ -131,6 +149,7 @@ class GroupChatBot {
     this.config.messageHistory = new Map();
     this.setupErrorHandling();
     this.setupHandlers();
+    this.setupMorningGreeting();
   }
   
   private setupErrorHandling() {
@@ -975,6 +994,51 @@ class GroupChatBot {
       console.error('Error in artist inquiry:', error);
       return 'YO GANG my brain stopped working fr fr\\! 💀 Try again later bestieee\\!';
     }
+  }
+
+  private setupMorningGreeting() {
+    // Schedule job for 8 AM Malaysia time (UTC+8)
+    scheduleJob('0 8 * * *', async () => {
+      try {
+        console.log('Sending morning greeting...');
+        const quote = this.getRandomQuote();
+        const greeting = this.formatMorningGreeting(quote);
+
+        // Send to all configured groups
+        for (const groupId of this.config.groupIds) {
+          try {
+            await this.bot.api.sendMessage(groupId, greeting, {
+              parse_mode: 'MarkdownV2',
+              disable_web_page_preview: true
+            } as any);
+            console.log(`Morning greeting sent to group ${groupId}`);
+          } catch (error) {
+            console.error(`Error sending morning greeting to group ${groupId}:`, error);
+          }
+        }
+      } catch (error) {
+        console.error('Error in morning greeting scheduler:', error);
+      }
+    });
+  }
+
+  private getRandomQuote(): Quote {
+    return this.morningQuotes[Math.floor(Math.random() * this.morningQuotes.length)];
+  }
+
+  private formatMorningGreeting(quote: Quote): string {
+    const greetings = [
+      "SELAMAT PAGI GANG\\! 🌅",
+      "PAGI PAGI DAH NAK BUAT KERJA\\! ⭐️",
+      "YO GANG DAAAAH BANGUN\\? 🌞",
+      "RISE AND SHINE GANG\\! 🌄"
+    ];
+
+    const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+    const escapedQuote = this.escapeMarkdown(quote.text);
+    const escapedAuthor = this.escapeMarkdown(quote.author);
+
+    return `${greeting}\\n\\n*Quote of the day*\\:\\n\\n"${escapedQuote}"\\n\\- ${escapedAuthor}\\n\\nLet's get this bread gang\\! 💪 Semoga hari ni productive gila\\! 🔥`;
   }
 
   public async start() {
