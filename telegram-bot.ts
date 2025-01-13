@@ -139,8 +139,8 @@ class GroupChatBot {
   private readonly GROUP_COOLDOWN = 10000; // 10 seconds cooldown per group
   private kickPolls: Map<string, PollInfo> = new Map();
   private merchKeywords: MerchKeyword = {
-    words: ['merch', 'merchandise', 'baju', 'tshirt', 't-shirt', 'tee', 'hoodie', 'cap', 'snapback', 'bundle'],
-    regex: /\b(merch|merchandise|baju|tshirt|t-shirt|tee|hoodie|cap|snapback|bundle)\b/i
+    words: ['merch', 'merchandise', 'baju', 'tshirt', 't-shirt', 'tee', 'hoodie', 'cap', 'snapback', 'bundle', 'store', 'shop', 'kedai', 'beli', 'buy', 'cop'],
+    regex: /\b(merch|merchandise|baju|tshirt|t-shirt|tee|hoodie|cap|snapback|bundle|store|shop|kedai|beli|buy|cop)\b/i
   };
   private socialKeywords: SocialKeyword = {
     words: ['ig', 'instagram', 'insta', 'social', 'socmed', 'media', 'follow'],
@@ -514,13 +514,19 @@ class GroupChatBot {
     if (messageTextLower.includes('slatan') || messageTextLower.includes('0108')) {
       if (this.merchKeywords.regex.test(messageTextLower)) {
         const merchResponse = this.handleMerchInquiry();
-        await ctx.reply(merchResponse);
+        await ctx.reply(merchResponse, { 
+          parse_mode: 'MarkdownV2',
+          disable_web_page_preview: true 
+        } as any);
         return;
       }
       
       if (this.socialKeywords.regex.test(messageTextLower)) {
         const socialResponse = this.handleSocialInquiry();
-        await ctx.reply(socialResponse);
+        await ctx.reply(socialResponse, { 
+          parse_mode: 'MarkdownV2',
+          disable_web_page_preview: true 
+        } as any);
         return;
       }
     }
