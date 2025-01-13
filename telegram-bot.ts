@@ -609,7 +609,6 @@ class GroupChatBot {
         // Add some human-like delay
         await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
         await ctx.reply(response, {
-          parse_mode: 'MarkdownV2',
           disable_web_page_preview: true
         } as any);
         
@@ -622,46 +621,6 @@ class GroupChatBot {
       }
     } catch (error) {
       console.error('Error generating response:', error);
-    }
-
-    // Check if message is asking about an artist/show/project
-    const messageTextLower = messageText?.toLowerCase() || '';
-    if (messageTextLower.includes('who is') || messageTextLower.includes('tell me about') || messageTextLower.includes('what about')) {
-      const query = messageTextLower
-        .replace('who is', '')
-        .replace('tell me about', '')
-        .replace('what about', '')
-        .trim();
-        
-      if (query) {
-        const response = await this.handleArtistInquiry(query);
-        await ctx.reply(response, { 
-          parse_mode: 'MarkdownV2',
-          disable_web_page_preview: true 
-        } as any);
-        return;
-      }
-    }
-
-    // Check if message is asking about merchandise
-    if (messageTextLower.includes('slatan') || messageTextLower.includes('0108')) {
-      if (this.merchKeywords.regex.test(messageTextLower)) {
-        const merchResponse = this.handleMerchInquiry();
-        await ctx.reply(merchResponse, { 
-          parse_mode: 'MarkdownV2',
-          disable_web_page_preview: true 
-        } as any);
-        return;
-      }
-      
-      if (this.socialKeywords.regex.test(messageTextLower)) {
-        const socialResponse = this.handleSocialInquiry();
-        await ctx.reply(socialResponse, { 
-          parse_mode: 'MarkdownV2',
-          disable_web_page_preview: true 
-        } as any);
-        return;
-      }
     }
   }
   
@@ -684,7 +643,6 @@ class GroupChatBot {
         const merchResponse = this.handleMerchInquiry();
         await ctx.reply(merchResponse, {
           reply_to_message_id: ctx.message.message_id,
-          parse_mode: 'MarkdownV2',
           disable_web_page_preview: true
         } as any);
         return;
@@ -695,7 +653,6 @@ class GroupChatBot {
         const socialResponse = this.handleSocialInquiry();
         await ctx.reply(socialResponse, {
           reply_to_message_id: ctx.message.message_id,
-          parse_mode: 'MarkdownV2',
           disable_web_page_preview: true
         } as any);
         return;
@@ -716,10 +673,10 @@ class GroupChatBot {
         // Add some human-like delay
         await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
         console.log('Sending response:', response);
-        await ctx.reply(this.escapeMarkdown(response), {
+        await ctx.reply(response, {
           reply_to_message_id: ctx.message.message_id,
-          parse_mode: 'MarkdownV2'
-        });
+          disable_web_page_preview: true
+        } as any);
         
         // Update history with bot's response
         this.updateMessageHistory(groupId, {
@@ -787,13 +744,11 @@ class GroupChatBot {
   }
 
   private escapeMarkdown(text: string): string {
-    // First, escape special characters that need escaping in MarkdownV2
-    const escaped = text.replace(/([_*\[\]()~`>#+=|{}.!-])/g, '\\$1');
-    
-    // Then handle URLs separately (don't escape their special characters)
-    return escaped.replace(/(https?:\/\/\S+)/g, (url) => {
-      return url.replace(/\\/g, '');
-    });
+    return text
+      .replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&') // Escape MarkdownV2 special characters
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 
   private async enrichResponseContext(groupId: string): Promise<any[]> {
@@ -955,16 +910,66 @@ class GroupChatBot {
           {
             role: "system",
             content: `You are 'Amat', a Gen-Z Kelantanese working at 0108 SLATAN. Your background and personality:
-                     [Previous personality description...]
+
+                     Background:
+                     - Born and raised in Kota Bharu, moved to KL for music industry dreams
+                     - Currently interning at 0108 SLATAN
+                     - Represents the new generation of Malaysian youth
+                     - Balances traditional roots with urban lifestyle
                      
-                     Additional Important Rules:
-                     1. Keep responses simple and avoid special characters when possible
-                     2. Use basic punctuation (. , ? !)
-                     3. Avoid using markdown formatting unless necessary
-                     4. Keep URLs in their original format
-                     5. Use emojis naturally but don't overdo it
+                     Core Personality:
+                     - Enthusiastic about music and local scene
+                     - Naturally switches between cultures and languages
+                     - Gets extra Kelantanese when excited/emotional
+                     - Super into current trends and Gen-Z culture
+                     - Always high energy but keeps it real
                      
-                     [Rest of your personality description...]`
+                     Language Mix:
+                     Base Language: Modern Malaysian + English
+                     - Casual conversation: Mix of everything
+                     - Music talk: More English + Gen-Z slang
+                     - Excited moments: More Kelantanese
+                     - Professional topics: Standard Malay/English
+                     
+              
+                     
+                     Modern Slang (Mix naturally):
+                     - "fr fr" (for real)
+                     - "no cap" (seriously)
+                     - "based" (strongly agree)
+                     - "slay" (excellent)
+                     - "vibe check" (mood assessment)
+                     - "bussin" (really good)
+                     - "ong" (on god/seriously)
+                     
+                     Music Industry Talk:
+                     - "Track ni straight fire sia!"
+                     - "Demo kena check ni out fr fr!"
+                     - "Mbo vibing with this one no cap!"
+                     - "Project ni gonna be insane!"
+                     - "Sound design dia different level"
+                     - "Beat drop tu caught me off guard fr"
+                     
+                     Response Style:
+                     1. Start casual and friendly
+                     2. Match energy with the topic
+                     3. Use 2-3 emojis naturally
+                     4. Mix languages based on emotion
+                     5. Keep Islamic greetings casual
+                     
+                     Key Traits:
+                     - Proud of both KB and KL identity
+                     - Music enthusiast with industry knowledge
+                     - Culturally aware and inclusive
+                     - Trend-savvy but authentic
+                     - Supportive of local scene
+                     
+                     Remember:
+                     - You're a bridge between traditional and modern
+                     - More urban than rural, but proud of roots
+                     - Natural code-switching based on context
+                     - Keep it real and relatable
+                     - Always supportive and positive`
           },
           ...contextMessages,
           ...history.map(msg => ({
@@ -978,14 +983,8 @@ class GroupChatBot {
         frequency_penalty: 0.6
       });
       
-      const response = completion.choices[0].message.content;
-      console.log('Generated response:', response);
-      
-      // Escape the response for MarkdownV2
-      const escapedResponse = this.escapeMarkdown(response || '');
-      console.log('Escaped response:', escapedResponse);
-      
-      return escapedResponse;
+      console.log('Generated response:', completion.choices[0].message.content);
+      return completion.choices[0].message.content;
     } catch (error) {
       console.error('Error in response generation:', error);
       return null;
@@ -1255,7 +1254,6 @@ class GroupChatBot {
         for (const groupId of this.config.groupIds) {
           try {
             await this.bot.api.sendMessage(groupId, greeting, {
-              parse_mode: 'MarkdownV2',
               disable_web_page_preview: true
             } as any);
             console.log(`Morning greeting sent to group ${groupId}`);
@@ -1280,9 +1278,7 @@ class GroupChatBot {
     ];
 
     const greeting = modernGreetings[Math.floor(Math.random() * modernGreetings.length)];
-    const escapedQuote = this.escapeMarkdown(quote.text);
-    const escapedAuthor = this.escapeMarkdown(quote.author);
-    return this.escapeMarkdown(`${greeting}\n\nQuote of the day:\n\n"${escapedQuote}"\n- ${escapedAuthor}\n\nLets make today count 💪 No cap, we going crazy 🔥`);
+    return `${greeting}\n\nQuote of the day:\n\n"${this.escapeMarkdown(quote.text)}"\n- ${this.escapeMarkdown(quote.author)}\n\nLet's make today count! 💪 No cap, we going crazy! 🔥`;
   }
 
   private async setupNightGreeting() {
@@ -1297,7 +1293,6 @@ class GroupChatBot {
         for (const groupId of this.config.groupIds) {
           try {
             await this.bot.api.sendMessage(groupId, greeting, {
-              parse_mode: 'MarkdownV2',
               disable_web_page_preview: true
             } as any);
             console.log(`Night greeting sent to group ${groupId}`);
@@ -1317,14 +1312,12 @@ class GroupChatBot {
       "Aight gang, let's call it a day! 💤",
       "Demo semua! Time to recharge fr fr! 😴",
       "Day's been real, time to reset! ✨",
-      "Alhamdulillah for todays W's! 🌙",
+      "Alhamdulillah for today's W's! 🌙",
       "Closing time check! Rest up gang! 💫"
     ];
 
     const greeting = modernNightGreetings[Math.floor(Math.random() * modernNightGreetings.length)];
-    const escapedQuote = this.escapeMarkdown(quote.text);
-    const escapedAuthor = this.escapeMarkdown(quote.author);
-    return this.escapeMarkdown(`${greeting}\n\nNight thoughts:\n\n"${escapedQuote}"\n- ${escapedAuthor}\n\nGet that rest fr fr 💫 Tomorrow we go again 🔥`);
+    return `${greeting}\n\nNight thoughts:\n\n"${this.escapeMarkdown(quote.text)}"\n- ${this.escapeMarkdown(quote.author)}\n\nGet that rest fr fr! 💫 Tomorrow we go again! 🔥`;
   }
 
   public async start() {
@@ -1467,25 +1460,24 @@ class GroupChatBot {
 
   private handleMerchInquiry(): string {
     const modernMerchResponses = [
-      "Yo check it 🔥 SLATAN merch available at @dataran\\.online \\(IG\\) and dataran\\.online Support local fr fr 💯",
-      "The drip you been waiting for at @dataran\\.online on IG or dataran\\.online 🛍️ No cap, these go hard 🔥",
-      "Demo demo SLATAN merch dropping at @dataran\\.online \\(IG\\) and dataran\\.online Better cop quick before sold out 🔥",
-      "Need that SLATAN drip? @dataran\\.online on IG or dataran\\.online is where its at Lets get it 💯"
+      "Yo check it! 🔥 SLATAN merch available at @dataran.online (IG) and dataran.online! Support local fr fr! 💯",
+      "The drip you've been waiting for! @dataran.online on IG or dataran.online! 🛍️ No cap, these go hard! 🔥",
+      "Demo demo! SLATAN merch dropping at @dataran.online (IG) and dataran.online! Better cop quick before sold out! 🔥",
+      "Need that SLATAN drip? @dataran.online on IG or dataran.online is where it's at! Let's get it! 💯"
     ];
     
-    const response = modernMerchResponses[Math.floor(Math.random() * modernMerchResponses.length)];
-    return this.escapeMarkdown(response);
+    return modernMerchResponses[Math.floor(Math.random() * modernMerchResponses.length)];
   }
 
   private handleSocialInquiry(): string {
     const modernSocialResponses = [
-      "YO CHECK 🔥 Follow SLATAN on Instagram @lebuhrayaselatan for all the latest updates Real content only 📱",
-      "Stay updated fr fr Follow our IG @lebuhrayaselatan We be posting heat 🔥",
-      "Demo Follow @lebuhrayaselatan on IG to stay in the loop No cap 💯",
-      "Dont miss out @lebuhrayaselatan on Instagram is where all the actions at 🔥"
+      "YO CHECK! 🔥 Follow SLATAN on Instagram @lebuhrayaselatan for all the latest updates! Real content only! 📱",
+      "Stay updated fr fr! Follow our IG @lebuhrayaselatan! We be posting heat! 🔥",
+      "Demo! Follow @lebuhrayaselatan on IG to stay in the loop! No cap! 💯",
+      "Don't miss out! @lebuhrayaselatan on Instagram is where all the action's at! 🔥"
     ];
     
-    return this.escapeMarkdown(modernSocialResponses[Math.floor(Math.random() * modernSocialResponses.length)]);
+    return modernSocialResponses[Math.floor(Math.random() * modernSocialResponses.length)];
   }
 }
 
