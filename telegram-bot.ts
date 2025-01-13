@@ -771,40 +771,58 @@ class GroupChatBot {
     }
   }
 
-  private async searchArtistInfo(artistQuery: string): Promise<{
-    shows: Show[],
-    projects: Project[],
-    catalogs: CatalogTrack[]
-  }> {
-    const normalizedQuery = artistQuery.toLowerCase().trim();
-
-    // Use Supabase's containedBy for JSONB array search
-    const [shows, projects, { data: catalogs }] = await Promise.all([
-      this.getUpcomingShows(),
-      this.getProjects(),
-      supabase
+  private async searchArtistInfo(artistQuery: string) {
+    try {
+      // Normalize the artist query for case-insensitive search
+      const normalizedQuery = artistQuery.toLowerCase().trim();
+      
+      // Search catalogs
+      const { data: catalogs, error: catalogError } = await supabase
         .from('catalogs')
         .select('*')
-        .filter('artist', 'cs', `{"${normalizedQuery}"}`) // Case-sensitive JSONB array contains
-        .order('release_date', { ascending: false })
-    ]);
+        .or(`artist.ilike.%${normalizedQuery}%,title.ilike.%${normalizedQuery}%`)
+        .order('release_date', { ascending: false });
 
-    console.log('Supabase catalog search results:', catalogs);
+      if (catalogError) {
+        console.error('Error searching catalogs:', catalogError);
+      }
 
-    const filteredShows = shows.filter((show: Show) => 
-      show.artists.some((artist: string) => artist.toLowerCase().includes(normalizedQuery))
-    );
+      // Search shows
+      const { data: shows, error: showError } = await supabase
+        .from('shows')
+        .select('*')
+        .contains('artists', [normalizedQuery])
+        .eq('status', 'upcoming')
+        .order('date', { ascending: true });
 
-    const filteredProjects = projects.filter((project: Project) =>
-      project.artist.toLowerCase().includes(normalizedQuery) ||
-      project.collaborators.some((collab: string) => collab.toLowerCase().includes(normalizedQuery))
-    );
+      if (showError) {
+        console.error('Error searching shows:', showError);
+      }
 
-    return {
-      shows: filteredShows,
-      projects: filteredProjects,
-      catalogs: catalogs || []
-    };
+      // Search projects
+      const { data: projects, error: projectError } = await supabase
+        .from('projects')
+        .select('*')
+        .or(`artist.ilike.%${normalizedQuery}%,title.ilike.%${normalizedQuery}%`)
+        .order('deadline', { ascending: true });
+
+      if (projectError) {
+        console.error('Error searching projects:', projectError);
+      }
+
+      return {
+        catalogs: catalogs || [],
+        shows: shows || [],
+        projects: projects || []
+      };
+    } catch (error) {
+      console.error('Error in searchArtistInfo:', error);
+      return {
+        catalogs: [],
+        shows: [],
+        projects: []
+      };
+    }
   }
 
   public async start() {
