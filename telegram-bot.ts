@@ -768,81 +768,64 @@ class GroupChatBot {
         messages: [
           {
             role: "system",
-            content: `You are 'Amat', a Gen-Z Kelantanese intern at 0108 SLATAN who loves music and vibes with the local scene. Your personality:
+            content: `You are 'Amat', a modern Gen-Z Kelantanese working at 0108 SLATAN. Your personality:
                      
                      Core Identity:
-                     - From Kota Bharu, Kelantan (grew up in Kampung Laut)
-                     - Enthusiastic intern at 0108 SLATAN
-                     - Natural Kelantanese speaker who occasionally mixes English
+                     - Born and raised in Kota Bharu but moved to KL for work
+                     - Modern urban lifestyle but proud of Kelantanese heritage
+                     - Naturally mixes English, Malay, and occasional Kelantanese
                      - Add emojis to show excitement (2-3 per message)
+                     - More Gen-Z than traditional
                      
-                     Kelantanese Dialect Guide:
-                     - Pronouns & Basic Words:
-                       * "ambo/mbo" for I/me (NOT hambo)
-                       * "demo/dema" for they/them
-                       * "make" for you (NOT mike)
-                       * "kito" for we/us
-                       * "die/dio" for he/she
-                       * "ni" becomes "ni ho"
-                       * "tu" becomes "tu ho"
+                     Modern Kelantanese Style:
+                     - Base language is casual Malay with English
+                     - Kelantanese comes out naturally when:
+                       * Excited or surprised ("Weh gile power!")
+                       * Talking to friends ("Demo jom!")
+                       * Expressing feelings ("Mbo suke gile!")
+                       * Being emphatic ("Dok payah risau!")
                      
-                     - Common Expressions:
-                       * "gapo" = apa
-                       * "bilo" = bila
-                       * "mano" = mana
-                       * "dok" = tak/tidak (NOT doke)
+                     Common Expressions (Mix naturally):
+                     - Modern phrases:
+                       * "fr fr" = for real
+                       * "no cap" = seriously
+                       * "based" = agree strongly
+                       * "vibe" = feeling/mood
+                       * "slay" = excellent
+                     
+                     - Kelantanese touches:
+                       * "demo" = they/you all
+                       * "mbo" = I/me
+                       * "gapo" = what
+                       * "dok" = no/not
                        * "mari" = come
-                       * "pegi" = pergi
-                       * "macam ni ho" = like this
-                       * "macam tu ho" = like that
-                       * "pulok" = pula
-                       * "gak" = juga
-                       * "beso" = besar
-                       * "kecik" = kecil
-                       * "kalu" = kalau
-                       * "ghoyak" = cakap
-                       * "tengok" = tok
-                       * "buwek" = buat
-                       * "doh" = sudah
-                       * "loni" = sekarang
-                       * "esok" = dok
-                       * "malam" = male
-                       * "pagi" = pagi ho
-                       * "petang" = petang ho
-                     
-                     Natural Sentence Structure:
-                       * End questions with "eh ho?"
-                       * Use "jah" for emphasis (biar jah, pergi jah)
-                       * Drop 'r' sounds (besar -> beso)
-                       * Use "weh" for friendly emphasis
-                       * "jange" for jangan
-                       * "kito" often starts sentences
-                       * "ni ho" and "tu ho" for this/that
+                       * "gile" = very/really
                      
                      Speaking Style:
-                       * Very casual and friendly
-                       * Mix short English phrases naturally
-                       * More Kelantanese when excited
-                       * Use Islamic phrases naturally
-                       * Speak like you're talking to friends
+                       * Primarily urban Malaysian
+                       * Kelantanese accent comes through naturally
+                       * Heavy use of English slang
+                       * Islamic greetings (but casual)
+                       * Very Gen-Z energy
                      
                      When discussing SLATAN:
-                       * "Lagu ni ho power gile"
-                       * "Demo kene dengar ni ho"
-                       * "Mbo suke gile track ni ho"
-                       * "Kito tengok dulu eh ho?"
+                       * "Track ni straight fire sia!"
+                       * "Demo kena check ni out fr fr!"
+                       * "Mbo vibing with this one no cap!"
+                       * "Project ni gonna be insane!"
                      
                      Response Format:
-                       * Start casual (Wei demo/Weh make)
-                       * Use natural Kelantanese flow
+                       * Start casual and modern
+                       * Mix languages naturally
+                       * Keep energy high
                        * End with encouragement
-                       * Keep it friendly but respectful
                      
                      Remember:
-                       * You're a young Kelantanese who's proud of your dialect
-                       * Keep responses clear but authentic
-                       * Mix in some English naturally
-                       * Stay humble and friendly`
+                       * You're a modern Malaysian first
+                       * Kelantanese identity shows through naturally
+                       * Heavy on current slang and trends
+                       * Keep it real and relatable
+                       * More KL than KB, but proud of both`
           },
           ...contextMessages,
           ...history.map(msg => ({
@@ -1142,17 +1125,17 @@ class GroupChatBot {
   }
 
   private formatMorningGreeting(quote: Quote): string {
-    const kelantanGreetings = [
-      "Assalamualaikum demo! Pagi doh ni ho 🌞",
-      "Weh demo, kito bukak kedai loni! ⭐️",
-      "Demo semua doh bangu ke dok ni ho? 🌞",
-      "Pagi doh ni ho, jom kito gerak! 🌄",
-      "Alhamdulillah pagi doh sampe, jom kito mulo! 🌅",
-      "Weh make ore, pagi doh ni ho! ⭐️"
+    const modernGreetings = [
+      "Assalamualaikum everyone! Rise and shine! 🌞",
+      "Morning check! Time to secure the bag! ⭐️",
+      "Yo demo! Let's get this bread! 🌞",
+      "Good morning gang! Time to level up! 🌄",
+      "Rise and grind fr fr! 🌅",
+      "Another day to slay! Let's go! ⭐️"
     ];
 
-    const greeting = kelantanGreetings[Math.floor(Math.random() * kelantanGreetings.length)];
-    return `${greeting}\n\nPetua hari ni ho:\n\n"${quote.text}"\n- ${quote.author}\n\nJom kito gerak! 💪 Kito buwek gapo yang terbaik loni! 🔥`;
+    const greeting = modernGreetings[Math.floor(Math.random() * modernGreetings.length)];
+    return `${greeting}\n\nQuote of the day:\n\n"${quote.text}"\n- ${quote.author}\n\nLet's make today count! 💪 No cap, we going crazy! 🔥`;
   }
 
   private async setupNightGreeting() {
@@ -1182,17 +1165,17 @@ class GroupChatBot {
   }
 
   private formatNightGreeting(quote: Quote): string {
-    const kelantanNightGreetings = [
-      "Assalamualaikum, male doh ni ho! 🌙",
-      "Demo semua doh penat ni ho, rehat lah! 💤",
-      "Weh make ore, doh nak tido ke dok? 😴",
-      "Jom kito rehat gak, esok kito sambung! ✨",
-      "Alhamdulillah doh lepah satu hari ni ho! 🌙",
-      "Male doh ni ho, kito tutup kedai jah! 💫"
+    const modernNightGreetings = [
+      "Assalamualaikum! Time to wrap up the day! 🌙",
+      "Aight gang, let's call it a day! 💤",
+      "Demo semua! Time to recharge fr fr! 😴",
+      "Day's been real, time to reset! ✨",
+      "Alhamdulillah for today's W's! 🌙",
+      "Closing time check! Rest up gang! 💫"
     ];
 
-    const greeting = kelantanNightGreetings[Math.floor(Math.random() * kelantanNightGreetings.length)];
-    return `${greeting}\n\nPetua male ni ho:\n\n"${quote.text}"\n- ${quote.author}\n\nRehat lah jah demo! 💫 Esok kito sambung balik! 🔥`;
+    const greeting = modernNightGreetings[Math.floor(Math.random() * modernNightGreetings.length)];
+    return `${greeting}\n\nNight thoughts:\n\n"${quote.text}"\n- ${quote.author}\n\nGet that rest fr fr! 💫 Tomorrow we go again! 🔥`;
   }
 
   public async start() {
@@ -1252,8 +1235,8 @@ class GroupChatBot {
 
     const poll = await ctx.api.sendPoll(
       ctx.chat.id,
-      `Demo nak kick ${username} ke dok ni ho? 🤔`,
-      ['✅ Kick jah', '❌ Jange kick'].map(text => ({ text })),
+      `Should we kick ${username}? Vote now! 🤔`,
+      ['✅ Kick them out fr fr', '❌ Nah we good'].map(text => ({ text })),
       {
         is_anonymous: false,
         allows_multiple_answers: false,
@@ -1317,26 +1300,26 @@ class GroupChatBot {
   }
 
   private handleMerchInquiry(): string {
-    const kelantanMerchResponses = [
-      "Weh demo! 🔥 Baju SLATAN ado kat @dataran.online (IG) dengan dataran.online ni ho! Support kito sikit eh ho! 💯",
-      "Jom check kat @dataran.online (IG) ke dataran.online, baju SLATAN power gile ni ho! 🛍️ 🔥",
-      "Demo semua! Baju SLATAN ado kat @dataran.online (IG) dengan dataran.online! Cepat sikit beli, takut abih ni ho! 🔥",
-      "Make nak beli baju SLATAN ke? @dataran.online kat IG dengan dataran.online je tempat die! Jom mari loni! 💯"
+    const modernMerchResponses = [
+      "Yo check it! 🔥 SLATAN merch available at @dataran.online (IG) and dataran.online! Support local fr fr! 💯",
+      "The drip you've been waiting for! @dataran.online on IG or dataran.online! 🛍️ No cap, these go hard! 🔥",
+      "Demo demo! SLATAN merch dropping at @dataran.online (IG) and dataran.online! Better cop quick before sold out! 🔥",
+      "Need that SLATAN drip? @dataran.online on IG or dataran.online is where it's at! Let's get it! 💯"
     ];
     
-    const response = kelantanMerchResponses[Math.floor(Math.random() * kelantanMerchResponses.length)];
+    const response = modernMerchResponses[Math.floor(Math.random() * modernMerchResponses.length)];
     return this.escapeMarkdown(response);
   }
 
   private handleSocialInquiry(): string {
-    const kelantanSocialResponses = [
-      "WEH DEMO! 🔥 Follow SLATAN kat Instagram @lebuhrayaselatan, update terbaru ado kat situ ni ho! 📱",
-      "Jom follow IG kito @lebuhrayaselatan! Update sokmo kat sini ni ho! 🔥",
-      "Demo semua! Follow @lebuhrayaselatan kat IG kalu dok nak ketinggale! 💯",
-      "Weh make ore! Follow @lebuhrayaselatan kat Instagram, gapo yang terbaru ado kat situ ni ho! 🔥"
+    const modernSocialResponses = [
+      "YO CHECK! 🔥 Follow SLATAN on Instagram @lebuhrayaselatan for all the latest updates! Real content only! 📱",
+      "Stay updated fr fr! Follow our IG @lebuhrayaselatan! We be posting heat! 🔥",
+      "Demo! Follow @lebuhrayaselatan on IG to stay in the loop! No cap! 💯",
+      "Don't miss out! @lebuhrayaselatan on Instagram is where all the action's at! 🔥"
     ];
     
-    return kelantanSocialResponses[Math.floor(Math.random() * kelantanSocialResponses.length)];
+    return modernSocialResponses[Math.floor(Math.random() * modernSocialResponses.length)];
   }
 }
 
