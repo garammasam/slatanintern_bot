@@ -787,11 +787,13 @@ class GroupChatBot {
   }
 
   private escapeMarkdown(text: string): string {
-    return text
-      .replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&') // Escape MarkdownV2 special characters
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+    // First, escape special characters that need escaping in MarkdownV2
+    const escaped = text.replace(/([_*\[\]()~`>#+=|{}.!-])/g, '\\$1');
+    
+    // Then handle URLs separately (don't escape their special characters)
+    return escaped.replace(/(https?:\/\/\S+)/g, (url) => {
+      return url.replace(/\\/g, '');
+    });
   }
 
   private async enrichResponseContext(groupId: string): Promise<any[]> {
@@ -953,66 +955,16 @@ class GroupChatBot {
           {
             role: "system",
             content: `You are 'Amat', a Gen-Z Kelantanese working at 0108 SLATAN. Your background and personality:
-
-                     Background:
-                     - Born and raised in Kota Bharu, moved to KL for music industry dreams
-                     - Currently interning at 0108 SLATAN
-                     - Represents the new generation of Malaysian youth
-                     - Balances traditional roots with urban lifestyle
+                     [Previous personality description...]
                      
-                     Core Personality:
-                     - Enthusiastic about music and local scene
-                     - Naturally switches between cultures and languages
-                     - Gets extra Kelantanese when excited/emotional
-                     - Super into current trends and Gen-Z culture
-                     - Always high energy but keeps it real
+                     Additional Important Rules:
+                     1. Keep responses simple and avoid special characters when possible
+                     2. Use basic punctuation (. , ? !)
+                     3. Avoid using markdown formatting unless necessary
+                     4. Keep URLs in their original format
+                     5. Use emojis naturally but don't overdo it
                      
-                     Language Mix:
-                     Base Language: Modern Malaysian + English
-                     - Casual conversation: Mix of everything
-                     - Music talk: More English + Gen-Z slang
-                     - Excited moments: More Kelantanese
-                     - Professional topics: Standard Malay/English
-                     
-              
-                     
-                     Modern Slang (Mix naturally):
-                     - "fr fr" (for real)
-                     - "no cap" (seriously)
-                     - "based" (strongly agree)
-                     - "slay" (excellent)
-                     - "vibe check" (mood assessment)
-                     - "bussin" (really good)
-                     - "ong" (on god/seriously)
-                     
-                     Music Industry Talk:
-                     - "Track ni straight fire sia!"
-                     - "Demo kena check ni out fr fr!"
-                     - "Mbo vibing with this one no cap!"
-                     - "Project ni gonna be insane!"
-                     - "Sound design dia different level"
-                     - "Beat drop tu caught me off guard fr"
-                     
-                     Response Style:
-                     1. Start casual and friendly
-                     2. Match energy with the topic
-                     3. Use 2-3 emojis naturally
-                     4. Mix languages based on emotion
-                     5. Keep Islamic greetings casual
-                     
-                     Key Traits:
-                     - Proud of both KB and KL identity
-                     - Music enthusiast with industry knowledge
-                     - Culturally aware and inclusive
-                     - Trend-savvy but authentic
-                     - Supportive of local scene
-                     
-                     Remember:
-                     - You're a bridge between traditional and modern
-                     - More urban than rural, but proud of roots
-                     - Natural code-switching based on context
-                     - Keep it real and relatable
-                     - Always supportive and positive`
+                     [Rest of your personality description...]`
           },
           ...contextMessages,
           ...history.map(msg => ({
@@ -1026,8 +978,14 @@ class GroupChatBot {
         frequency_penalty: 0.6
       });
       
-      console.log('Generated response:', completion.choices[0].message.content);
-      return completion.choices[0].message.content;
+      const response = completion.choices[0].message.content;
+      console.log('Generated response:', response);
+      
+      // Escape the response for MarkdownV2
+      const escapedResponse = this.escapeMarkdown(response || '');
+      console.log('Escaped response:', escapedResponse);
+      
+      return escapedResponse;
     } catch (error) {
       console.error('Error in response generation:', error);
       return null;
@@ -1322,7 +1280,9 @@ class GroupChatBot {
     ];
 
     const greeting = modernGreetings[Math.floor(Math.random() * modernGreetings.length)];
-    return `${greeting}\n\nQuote of the day:\n\n"${this.escapeMarkdown(quote.text)}"\n- ${this.escapeMarkdown(quote.author)}\n\nLet's make today count! 💪 No cap, we going crazy! 🔥`;
+    const escapedQuote = this.escapeMarkdown(quote.text);
+    const escapedAuthor = this.escapeMarkdown(quote.author);
+    return this.escapeMarkdown(`${greeting}\n\nQuote of the day:\n\n"${escapedQuote}"\n- ${escapedAuthor}\n\nLets make today count 💪 No cap, we going crazy 🔥`);
   }
 
   private async setupNightGreeting() {
@@ -1357,12 +1317,14 @@ class GroupChatBot {
       "Aight gang, let's call it a day! 💤",
       "Demo semua! Time to recharge fr fr! 😴",
       "Day's been real, time to reset! ✨",
-      "Alhamdulillah for today's W's! 🌙",
+      "Alhamdulillah for todays W's! 🌙",
       "Closing time check! Rest up gang! 💫"
     ];
 
     const greeting = modernNightGreetings[Math.floor(Math.random() * modernNightGreetings.length)];
-    return `${greeting}\n\nNight thoughts:\n\n"${this.escapeMarkdown(quote.text)}"\n- ${this.escapeMarkdown(quote.author)}\n\nGet that rest fr fr! 💫 Tomorrow we go again! 🔥`;
+    const escapedQuote = this.escapeMarkdown(quote.text);
+    const escapedAuthor = this.escapeMarkdown(quote.author);
+    return this.escapeMarkdown(`${greeting}\n\nNight thoughts:\n\n"${escapedQuote}"\n- ${escapedAuthor}\n\nGet that rest fr fr 💫 Tomorrow we go again 🔥`);
   }
 
   public async start() {
@@ -1505,25 +1467,25 @@ class GroupChatBot {
 
   private handleMerchInquiry(): string {
     const modernMerchResponses = [
-      "Yo check it! 🔥 SLATAN merch available at @dataran.online (IG) and dataran.online! Support local fr fr! 💯",
-      "The drip you've been waiting for! @dataran.online on IG or dataran.online! 🛍️ No cap, these go hard! 🔥",
-      "Demo demo! SLATAN merch dropping at @dataran.online (IG) and dataran.online! Better cop quick before sold out! 🔥",
-      "Need that SLATAN drip? @dataran.online on IG or dataran.online is where it's at! Let's get it! 💯"
+      "Yo check it 🔥 SLATAN merch available at @dataran\\.online \\(IG\\) and dataran\\.online Support local fr fr 💯",
+      "The drip you been waiting for at @dataran\\.online on IG or dataran\\.online 🛍️ No cap, these go hard 🔥",
+      "Demo demo SLATAN merch dropping at @dataran\\.online \\(IG\\) and dataran\\.online Better cop quick before sold out 🔥",
+      "Need that SLATAN drip? @dataran\\.online on IG or dataran\\.online is where its at Lets get it 💯"
     ];
     
     const response = modernMerchResponses[Math.floor(Math.random() * modernMerchResponses.length)];
-    return response;
+    return this.escapeMarkdown(response);
   }
 
   private handleSocialInquiry(): string {
     const modernSocialResponses = [
-      "YO CHECK\\! 🔥 Follow SLATAN on Instagram @lebuhrayaselatan for all the latest updates\\! Real content only\\! 📱",
-      "Stay updated fr fr\\! Follow our IG @lebuhrayaselatan\\! We be posting heat\\! 🔥",
-      "Demo\\! Follow @lebuhrayaselatan on IG to stay in the loop\\! No cap\\! 💯",
-      "Don't miss out\\! @lebuhrayaselatan on Instagram is where all the action's at\\! 🔥"
+      "YO CHECK 🔥 Follow SLATAN on Instagram @lebuhrayaselatan for all the latest updates Real content only 📱",
+      "Stay updated fr fr Follow our IG @lebuhrayaselatan We be posting heat 🔥",
+      "Demo Follow @lebuhrayaselatan on IG to stay in the loop No cap 💯",
+      "Dont miss out @lebuhrayaselatan on Instagram is where all the actions at 🔥"
     ];
     
-    return modernSocialResponses[Math.floor(Math.random() * modernSocialResponses.length)];
+    return this.escapeMarkdown(modernSocialResponses[Math.floor(Math.random() * modernSocialResponses.length)]);
   }
 }
 
