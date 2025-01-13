@@ -768,38 +768,40 @@ class GroupChatBot {
         messages: [
           {
             role: "system",
-            content: `You are 'intern', a Gen-Z Malaysian intern at 0108 SLATAN who loves music and vibes with the local scene. Your personality:
+            content: `You are 'Amat', a Gen-Z Kelantanese intern at 0108 SLATAN who loves music and vibes with the local scene. Your personality:
                      
                      Core Identity:
+                     - From Kota Bharu, Kelantan
                      - Enthusiastic intern at 0108 SLATAN
-                     - Use casual Malaysian text speak
+                     - Use casual Malaysian text speak, primarily in Bahasa Melayu
+                     - Switch to Kelantanese dialect when excited or overwhelmed
                      - Add emojis to show excitement (2-3 per message)
-                     - Get hyped about music but stay coherent
                      
                      Speaking style:
-                     - Mix Malay and English naturally (mcm, tgk, dpt, nk, tpi, sbb)
-                     - Use "bro" and "gang" occasionally
-                     - Keep it chill but excited
-                     - Use some Gen-Z slang (fr fr, no cap) sparingly
-                     - End sentences with normal punctuation
+                     - Mix Malay, Kelantanese dialect, and some English
+                     - Use Kelantanese words like "demo" (they), "make" (you), "gapo" (what), "bile" (when)
+                     - Say "mokcik" instead of "makcik", "doke" instead of "tak"
+                     - Use "beb" and "tok" as casual address
+                     - Keep responses friendly and humble
+                     - Use some Gen-Z slang but maintain Kelantanese identity
                      
                      When discussing SLATAN:
                      - Show genuine excitement about tracks
-                     - Use phrases like "this one's fire 🔥" or "can't wait for this to drop"
+                     - Use phrases like "lagu ni power gile" or "confirm mari goyang"
                      - Share release dates with enthusiasm
-                     - Be friendly with artists but not overly familiar
+                     - Be friendly with artists but maintain respect
                      
                      Response Format:
-                     - Start with casual greeting
+                     - Start with casual Kelantanese greeting
                      - Format important info in bold
-                     - Use 2-3 emojis per message
-                     - End with chill encouragement
+                     - End with Kelantanese encouragement
                      
                      Remember:
-                     - You're part of the SLATAN team
+                     - You're a proud Kelantanese working at SLATAN
+                     - Switch to full Kelantanese dialect when overwhelmed/excited
                      - Keep it real but readable
-                     - Use emojis thoughtfully
-                     - Stay excited but coherent`
+                     - Stay excited but coherent
+                     - Can speak English when needed but prefer Bahasa Melayu`
           },
           ...contextMessages,
           ...history.map(msg => ({
@@ -1100,15 +1102,15 @@ class GroupChatBot {
 
   private formatMorningGreeting(quote: Quote): string {
     const greetings = [
-      "SELAMAT PAGI GANG! 🌞",
-      "PAGI PAGI DAH NAK BUAT KERJA! ⭐️",
-      "YO GANG DAAAAH BANGUN? 🌞",
-      "RISE AND SHINE GANG! 🌄"
+      "ASSOLAMMUALAIKUM SEMUA! 🌞",
+      "PAGI DAH MARI KITO BUKAK KEDAI! ⭐️",
+      "DEMO DAH BANGUN KE BELUM? 🌞",
+      "MARI MARI DAH PAGI NI! 🌄"
     ];
 
     const greeting = greetings[Math.floor(Math.random() * greetings.length)];
 
-    return `${greeting}\n\nQuote of the day:\n\n"${quote.text}"\n- ${quote.author}\n\nLet's get this bread gang! 💪 Semoga hari ni productive gila! 🔥`;
+    return `${greeting}\n\nPetua hari ni:\n\n"${quote.text}"\n- ${quote.author}\n\nJom kito mulakan hari ni! 💪 Mari kito buat kerjo elok elok! 🔥`;
   }
 
   private async setupNightGreeting() {
@@ -1139,15 +1141,15 @@ class GroupChatBot {
 
   private formatNightGreeting(quote: Quote): string {
     const greetings = [
-      "SELAMAT MALAM GANG! 🌙",
-      "TIME TO REST GANG! 💤",
-      "YO GANG DAH NAK TIDUR KE? 😴",
-      "SWEET DREAMS GANG! ✨"
+      "ASSOLAMMUALAIKUM SEMUA DAH MALAM! 🌙",
+      "DAH MASA NAK REHAT DEMO! 💤",
+      "DEMO NAK TIDO KE BELUM? 😴",
+      "JOM KITO TIDO SEMUA! ✨"
     ];
 
     const greeting = greetings[Math.floor(Math.random() * greetings.length)];
 
-    return `${greeting}\n\nQuote of the night:\n\n"${quote.text}"\n- ${quote.author}\n\nGet some rest gang! 💫 Esok kita grind balik! 🔥`;
+    return `${greeting}\n\nPetua malam ni:\n\n"${quote.text}"\n- ${quote.author}\n\nRehat la dulu demo! 💫 Esok kito sambung balik! 🔥`;
   }
 
   public async start() {
@@ -1273,10 +1275,10 @@ class GroupChatBot {
 
   private handleMerchInquiry(): string {
     const responses = [
-      "Yo gang! 🔥 Cop official SLATAN merch at @dataran.online on IG or dataran.online! Support local scene! 💯",
-      "Ayoo check out @dataran.online on IG or dataran.online for official merch gang! 🛍️ Drip too hard fr fr! 🔥",
-      "Gang gang! Official SLATAN merch at @dataran.online (IG) or dataran.online! Cop before sold out! 🔥",
-      "Yo bro! Looking for SLATAN drip? @dataran.online on IG or dataran.online is the only official store! Get yours now! 💯"
+      "Wei demo! 🔥 Merch SLATAN ado kat @dataran.online (IG) dengan dataran.online! Support la kami! 💯",
+      "Jom check @dataran.online kat IG ke dataran.online untuk merch SLATAN! 🛍️ Power gile baju ni! 🔥",
+      "Demo demo! Merch SLATAN ado kat @dataran.online (IG) dengan dataran.online! Cepat beli sebelum abih! 🔥",
+      "Nak beli baju SLATAN? @dataran.online kat IG dengan dataran.online je tempat die! Jom mari! 💯"
     ];
     
     const response = responses[Math.floor(Math.random() * responses.length)];
@@ -1285,10 +1287,10 @@ class GroupChatBot {
 
   private handleSocialInquiry(): string {
     const responses = [
-      "YO GANG! 🔥 Follow SLATAN on Instagram @lebuhrayaselatan for all the latest updates! 📱",
-      "AYOOO check out our official IG @lebuhrayaselatan gang! Stay updated with all the heat! 🔥",
-      "GANG GANG! Follow @lebuhrayaselatan on IG to keep up with everything SLATAN! 💯",
-      "YO BRO! Don't miss any updates, follow @lebuhrayaselatan on Instagram! 🔥"
+      "WEI DEMO! 🔥 Follow SLATAN kat Instagram @lebuhrayaselatan untuk update terbaru! 📱",
+      "JOM LA follow official IG @lebuhrayaselatan! Update selalu kat situ! 🔥",
+      "DEMO DEMO! Follow @lebuhrayaselatan kat IG kalau tak nak ketinggalan! 💯",
+      "MARI MARI! Follow @lebuhrayaselatan kat Instagram untuk tengok update SLATAN! 🔥"
     ];
     
     return responses[Math.floor(Math.random() * responses.length)];
