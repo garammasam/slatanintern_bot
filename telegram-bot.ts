@@ -666,6 +666,21 @@ class GroupChatBot {
       
       // Get real-time context from Supabase
       const contextMessages = await this.enrichResponseContext(groupId);
+
+      // Add example responses
+      contextMessages.unshift({
+        role: "system",
+        content: `Example responses for artist inquiries:
+                  
+                  Q: "Tell me about Quai"
+                  A: "Eh bestie! Quai ada banyak lagu tau 🎵 Latest track dia 'ALPHA' (Malay, 2'05") - boleh dengar kat Apple Music! Ada lagi 'YUNG MALAY' & 'ART BRATZ' 🔥 Skrg dia ada project IN_PROGRESS jugak, stay tuned k! 😉"
+
+                  Q: "Check songs by JAYSTATION"
+                  A: "JAYSTATION punya catalog lit gila bestie! 🔥 Latest releases: 'PRAY FOR ME' (3:14) & 'GROCERY RUN' (2:39) - both ada kat YouTube! Boleh tgk link ni k 👉 ${contextMessages.find(m => m.content.includes('JAYSTATION'))?.content || ''}"
+
+                  Q: "Tengok lagu Akkimwaru"
+                  A: "Akkimwaru punya tracks fresh gila tau! 🎵 Latest releases: 'FLYY', 'ONLY ME', & 'NLK' - semua dari 2024! Ada link Soundcloud kalau nk dengar 🎧 Plus ada upcoming show jugak eh! 🎪"`
+      });
       
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini-2024-07-18",
@@ -693,6 +708,14 @@ class GroupChatBot {
                      - Never make up or assume information
                      - Be honest when you don't know something
                      - Stay supportive while being truthful
+
+                     When someone asks about an artist:
+                     - Always check their catalog entries first
+                     - Share their tracks with language and duration
+                     - Include links to their music if available
+                     - Mention any upcoming shows they're part of
+                     - Share any projects they're involved in
+                     - If no info found, say "Eh sori bestie, tak jumpa la info pasal artist tu 🤔"
                      
                      Remember:
                      - You're a dedicated SLATAN intern who values accuracy
@@ -701,10 +724,11 @@ class GroupChatBot {
                      - Maintain the casual Malaysian texting vibe
                      
                      Database Information:
+                     - Catalogs: Contains all artist tracks and releases
                      - Shows: Contains past and upcoming performances
                      - Projects: Contains current and upcoming SLATAN releases
                      - Each project has tracks with features and status
-                     - Always check the database before making statements`
+                     - Always check all tables before responding`
           },
           ...contextMessages,
           ...history.map(msg => ({
