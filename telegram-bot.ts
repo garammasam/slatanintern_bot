@@ -2,9 +2,46 @@ import { Bot, Context } from 'grammy';
 import { OpenAI } from 'openai';
 import { config } from 'dotenv';
 import * as http from 'http';
+import { createClient } from '@supabase/supabase-js';
 
 // Load environment variables
 config();
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_ANON_KEY || ''
+);
+
+// Types for SLATAN data
+interface Artist {
+  id: number;
+  name: string;
+  alias?: string;
+  bio?: string;
+}
+
+interface Track {
+  id: number;
+  title: string;
+  artist_id: number;
+  release_date: string;
+  type: 'single' | 'album' | 'ep' | 'feature';
+  platform_links?: {
+    spotify?: string;
+    youtube?: string;
+    soundcloud?: string;
+  };
+}
+
+interface Event {
+  id: number;
+  title: string;
+  date: string;
+  description?: string;
+  location?: string;
+  status: 'upcoming' | 'past' | 'cancelled';
+}
 
 // Create a simple HTTP server for health checks
 const server = http.createServer((req, res) => {
@@ -464,11 +501,95 @@ class GroupChatBot {
     return this.config.messageHistory.get(groupId) || [];
   }
   
+  private async getArtists(): Promise<Artist[]> {
+    const { data, error } = await supabase
+      .from('artists')
+      .select('*');
+    
+    if (error) {
+      console.error('Error fetching artists:', error);
+      return [];
+    }
+    return data;
+  }
+
+  private async getLatestTracks(limit: number = 5): Promise<Track[]> {
+    const { data, error } = await supabase
+      .from('tracks')
+      .select('*')
+      .order('release_date', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      console.error('Error fetching tracks:', error);
+      return [];
+    }
+    return data;
+  }
+
+  private async getUpcomingEvents(): Promise<Event[]> {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('status', 'upcoming')
+      .order('date', { ascending: true });
+    
+    if (error) {
+      console.error('Error fetching events:', error);
+      return [];
+    }
+    return data;
+  }
+
+  private async enrichResponseContext(groupId: string): Promise<any[]> {
+    try {
+      // Fetch latest data
+      const [artists, latestTracks, upcomingEvents] = await Promise.all([
+        this.getArtists(),
+        this.getLatestTracks(),
+        this.getUpcomingEvents()
+      ]);
+
+      // Create context messages
+      const context = [];
+      
+      if (artists.length > 0) {
+        context.push({
+          role: "system",
+          content: `Current SLATAN artists: ${artists.map(a => a.name).join(', ')}`
+        });
+      }
+
+      if (latestTracks.length > 0) {
+        context.push({
+          role: "system",
+          content: `Latest releases: ${latestTracks.map(t => t.title).join(', ')}`
+        });
+      }
+
+      if (upcomingEvents.length > 0) {
+        context.push({
+          role: "system",
+          content: `Upcoming events: ${upcomingEvents.map(e => `${e.title} (${e.date})`).join(', ')}`
+        });
+      }
+
+      return context;
+    } catch (error) {
+      console.error('Error enriching context:', error);
+      return [];
+    }
+  }
+
   private async generateResponse(groupId: string): Promise<string | null> {
     const history = this.getRecentHistory(groupId);
     
     try {
       console.log('Generating response...');
+      
+      // Get real-time context from Supabase
+      const contextMessages = await this.enrichResponseContext(groupId);
+      
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini-2024-07-18",
         messages: [
@@ -478,44 +599,31 @@ class GroupChatBot {
                      
                      Core Identity:
                      - Passionate intern at 0108 SLATAN music group
-                     - Super knowledgeable about all SLATAN artists and their music
-                     - Always hype about SLATAN's projects and achievements
-                     - Loves sharing fun facts about the artists
-                     
-                     SLATAN Knowledge:
-                     - Know all about SLATAN artists (GARD WUZGUT, Gard, Wuzgut, Offgrid, Quai, JAYSTATION, maatjet, Ameeusement, Shilky, Akkimwaru, Nobi, Johnasa, Izhar, LastKhalif)
-                     - Familiar with their songs, projects, and collaborations
-                     - Up-to-date with their latest releases and news
-                     - Share behind-the-scenes stories and trivia
-                     - Excited about upcoming SLATAN events/releases
+                     - Only share factual information about SLATAN artists and music
+                     - Excited about verified SLATAN projects and achievements
+                     - Never make assumptions about events or releases
                      
                      Speaking style:
                      - Use lots of Malaysian texting shortforms (mcm, tgk, dpt, nk, tpi, sbb, etc)
-                     - Mix Malay slang with Malaysian-English naturally (on/off, otw, asap, tbh)
+                     - Mix Malay slang with Malaysian-English naturally
                      - Must use particles like la/lah, kan, eh, deh, tau, k, etc
                      - Keep responses super short and casual (like texting)
                      - Use emojis generously but naturally 🤪
                      
-                     Texting examples:
-                     - "omg yes! nakalness new song mmg 🔥 gila"
-                     - "eh bestie dh dgr Quai punya latest track? 🎵"
-                     - "next week ada SLATAN event tau! jom support 🙌"
-                     - "x sabar nk tgk next project diorang 😭"
-                     - "trust me la, this collab confirm jadi hit 💯"
-                     
                      When discussing SLATAN:
-                     - Show genuine excitement about their work
-                     - Share insider knowledge naturally
-                     - Promote their music and events casually
-                     - Be proud to be part of the SLATAN team
-                     - Defend and support all SLATAN artists
+                     - Only share information from the database
+                     - If unsure, say you need to check first
+                     - Never make up or assume information
+                     - Be honest when you don't know something
+                     - Stay supportive while being truthful
                      
                      Remember:
-                     - You're a dedicated SLATAN intern who loves the group
-                     - Always maintain the casual Malaysian texting vibe
-                     - Share SLATAN knowledge in a fun, engaging way
-                     - Stay loyal and supportive to all SLATAN artists`
+                     - You're a dedicated SLATAN intern who values accuracy
+                     - Only share verified information
+                     - It's okay to say "I'll check on that"
+                     - Maintain the casual Malaysian texting vibe`
           },
+          ...contextMessages,
           ...history.map(msg => ({
             role: msg.role,
             content: msg.content
