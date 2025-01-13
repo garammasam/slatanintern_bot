@@ -14,6 +14,61 @@ const supabase = createClient(
 );
 
 // Types for SLATAN data
+interface Show {
+  id: string;
+  title: string;
+  type: 'Concert' | 'Festival';
+  status: 'upcoming' | 'completed';
+  artists: string[];
+  date: string;
+  venue: string;
+  venue_type: 'Indoor' | 'Outdoor';
+  location: string;
+  description: string;
+  ticket_link?: string;
+  setlist?: Array<{
+    type: string;
+    title: string;
+    artist: string;
+    duration: string;
+  }>;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Project {
+  id: string;
+  title: string;
+  artist: string;
+  status: 'IN_PROGRESS' | 'COMPLETED';
+  deadline: string;
+  start_date: string;
+  budget: number;
+  genre: string;
+  producer: string;
+  notes?: string;
+  tasks: Array<{
+    id: number;
+    text: string;
+    completed: boolean;
+  }>;
+  collaborators: string[];
+  tracks: Array<{
+    id: number;
+    title: string;
+    status: 'WRITING' | 'RECORDING' | 'MIXING' | 'MASTERING';
+    features: string[];
+    notes?: string;
+    demoLink?: string;
+    bpm?: string;
+    key?: string;
+    duration?: string;
+    recordingLocation?: string;
+  }>;
+  created_at: string;
+  updated_at: string;
+}
+
 interface Artist {
   id: number;
   name: string;
@@ -541,36 +596,82 @@ class GroupChatBot {
     return data;
   }
 
+  private async getShows(status?: 'upcoming' | 'completed'): Promise<Show[]> {
+    let query = supabase
+      .from('shows')
+      .select('*')
+      .order('date', { ascending: true });
+    
+    if (status) {
+      query = query.eq('status', status);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('Error fetching shows:', error);
+      return [];
+    }
+    return data;
+  }
+
+  private async getProjects(status?: 'IN_PROGRESS' | 'COMPLETED'): Promise<Project[]> {
+    let query = supabase
+      .from('projects')
+      .select('*')
+      .order('deadline', { ascending: true });
+    
+    if (status) {
+      query = query.eq('status', status);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('Error fetching projects:', error);
+      return [];
+    }
+    return data;
+  }
+
   private async enrichResponseContext(groupId: string): Promise<any[]> {
     try {
       // Fetch latest data
-      const [artists, latestTracks, upcomingEvents] = await Promise.all([
-        this.getArtists(),
-        this.getLatestTracks(),
-        this.getUpcomingEvents()
+      const [upcomingShows, currentProjects] = await Promise.all([
+        this.getShows('upcoming'),
+        this.getProjects('IN_PROGRESS')
       ]);
 
       // Create context messages
       const context = [];
       
-      if (artists.length > 0) {
+      if (upcomingShows.length > 0) {
         context.push({
           role: "system",
-          content: `Current SLATAN artists: ${artists.map(a => a.name).join(', ')}`
+          content: `Upcoming shows: ${upcomingShows.map(s => 
+            `${s.title} at ${s.venue} (${s.date}) featuring ${s.artists.join(', ')}`
+          ).join('; ')}`
         });
       }
 
-      if (latestTracks.length > 0) {
+      if (currentProjects.length > 0) {
         context.push({
           role: "system",
-          content: `Latest releases: ${latestTracks.map(t => t.title).join(', ')}`
+          content: `Current projects: ${currentProjects.map(p => 
+            `${p.title} by ${p.artist} (${p.status.toLowerCase()}, deadline: ${p.deadline})`
+          ).join('; ')}`
         });
-      }
 
-      if (upcomingEvents.length > 0) {
-        context.push({
-          role: "system",
-          content: `Upcoming events: ${upcomingEvents.map(e => `${e.title} (${e.date})`).join(', ')}`
+        // Add detailed track information for each project
+        currentProjects.forEach(project => {
+          if (project.tracks?.length > 0) {
+            context.push({
+              role: "system",
+              content: `Tracks in ${project.title}: ${project.tracks.map(t => 
+                `${t.title} (${t.status.toLowerCase()}${t.features.length > 0 ? `, featuring ${t.features.join(', ')}` : ''})`
+              ).join('; ')}`
+            });
+          }
         });
       }
 
@@ -619,9 +720,15 @@ class GroupChatBot {
                      
                      Remember:
                      - You're a dedicated SLATAN intern who values accuracy
-                     - Only share verified information
+                     - Only share verified information from the database
                      - It's okay to say "I'll check on that"
-                     - Maintain the casual Malaysian texting vibe`
+                     - Maintain the casual Malaysian texting vibe
+                     
+                     Database Information:
+                     - Shows: Contains past and upcoming performances
+                     - Projects: Contains current and upcoming SLATAN releases
+                     - Each project has tracks with features and status
+                     - Always check the database before making statements`
           },
           ...contextMessages,
           ...history.map(msg => ({
@@ -642,7 +749,25 @@ class GroupChatBot {
       return null;
     }
   }
-  
+
+  // Add method to search for specific artist info
+  private async searchArtistInfo(artist: string): Promise<{shows: Show[], projects: Project[]}> {
+    const [shows, projects] = await Promise.all([
+      this.getShows().then(shows => 
+        shows.filter(show => show.artists.some(a => a.toLowerCase().includes(artist.toLowerCase())))
+      ),
+      this.getProjects().then(projects => 
+        projects.filter(project => 
+          project.tracks.some(track => 
+            track.features.some(f => f.toLowerCase().includes(artist.toLowerCase()))
+          )
+        )
+      )
+    ]);
+
+    return { shows, projects };
+  }
+
   public async start() {
     try {
       console.log('Starting bot...');
