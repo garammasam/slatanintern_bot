@@ -666,21 +666,6 @@ class GroupChatBot {
       
       // Get real-time context from Supabase
       const contextMessages = await this.enrichResponseContext(groupId);
-
-      // Add example responses
-      contextMessages.unshift({
-        role: "system",
-        content: `Example responses for artist inquiries:
-                  
-                  Q: "Tell me about Quai"
-                  A: "Eh bestie! Quai ada banyak lagu tau 🎵 Latest track dia 'ALPHA' (Malay, 2'05") - boleh dengar kat Apple Music! Ada lagi 'YUNG MALAY' & 'ART BRATZ' 🔥 Skrg dia ada project IN_PROGRESS jugak, stay tuned k! 😉"
-
-                  Q: "Check songs by JAYSTATION"
-                  A: "JAYSTATION punya catalog lit gila bestie! 🔥 Latest releases: 'PRAY FOR ME' (3:14) & 'GROCERY RUN' (2:39) - both ada kat YouTube! Boleh tgk link ni k 👉 ${contextMessages.find(m => m.content.includes('JAYSTATION'))?.content || ''}"
-
-                  Q: "Tengok lagu Akkimwaru"
-                  A: "Akkimwaru punya tracks fresh gila tau! 🎵 Latest releases: 'FLYY', 'ONLY ME', & 'NLK' - semua dari 2024! Ada link Soundcloud kalau nk dengar 🎧 Plus ada upcoming show jugak eh! 🎪"`
-      });
       
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini-2024-07-18",
@@ -710,12 +695,19 @@ class GroupChatBot {
                      - Stay supportive while being truthful
 
                      When someone asks about an artist:
-                     - Always check their catalog entries first
-                     - Share their tracks with language and duration
-                     - Include links to their music if available
+                     - Share their latest tracks first
+                     - Include track language and duration
+                     - Add links to their music if available
                      - Mention any upcoming shows they're part of
-                     - Share any projects they're involved in
+                     - Share any ongoing projects they're involved in
                      - If no info found, say "Eh sori bestie, tak jumpa la info pasal artist tu 🤔"
+                     
+                     Response Format for Artist Inquiries:
+                     - Start with casual greeting
+                     - List latest tracks with language and duration
+                     - Add music links if available
+                     - Mention any upcoming shows or projects
+                     - End with an emoji and encouraging message
                      
                      Remember:
                      - You're a dedicated SLATAN intern who values accuracy
@@ -786,16 +778,18 @@ class GroupChatBot {
   }> {
     const normalizedQuery = artistQuery.toLowerCase().trim();
 
-    // Use Supabase's ilike for better text matching
+    // Use Supabase's containedBy for JSONB array search
     const [shows, projects, { data: catalogs }] = await Promise.all([
       this.getUpcomingShows(),
       this.getProjects(),
       supabase
         .from('catalogs')
         .select('*')
-        .ilike('artist::text', `%${normalizedQuery}%`) // Convert JSONB to text and use ilike
+        .filter('artist', 'cs', `{"${normalizedQuery}"}`) // Case-sensitive JSONB array contains
         .order('release_date', { ascending: false })
     ]);
+
+    console.log('Supabase catalog search results:', catalogs);
 
     const filteredShows = shows.filter((show: Show) => 
       show.artists.some((artist: string) => artist.toLowerCase().includes(normalizedQuery))
