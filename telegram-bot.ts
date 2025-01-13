@@ -461,7 +461,7 @@ class GroupChatBot {
         // Add some human-like delay
         await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
         await ctx.reply(response, {
-          parse_mode: 'HTML' // Enable HTML parsing for formatting
+          parse_mode: 'MarkdownV2' // Use Markdown instead of HTML
         });
         
         // Update history with bot's response
@@ -502,7 +502,7 @@ class GroupChatBot {
         console.log('Sending response:', response);
         await ctx.reply(response, {
           reply_to_message_id: ctx.message.message_id,
-          parse_mode: 'HTML' // Enable HTML parsing for formatting
+          parse_mode: 'MarkdownV2' // Use Markdown instead of HTML
         });
         
         // Update history with bot's response
@@ -591,7 +591,7 @@ class GroupChatBot {
           context.push({
             role: "system",
             content: `Catalog tracks by ${artistQuery}: ${artistInfo.catalogs.map(track => 
-              `<b>${track.title}</b> (${track.language}, ${track.duration}${track.link ? `, ${track.link}` : ''})`
+              `*${track.title}* (${track.language}, ${track.duration}${track.link ? `, ${track.link}` : ''})`
             ).join('; ')}`
           });
         } else {
@@ -603,7 +603,7 @@ class GroupChatBot {
           context.push({
             role: "system",
             content: `Shows featuring ${artistQuery}: ${artistInfo.shows.map(show => 
-              `<b>${show.title}</b> at ${show.venue} (${show.date})`
+              `*${show.title}* at ${show.venue} (${show.date})`
             ).join('; ')}`
           });
         }
@@ -613,7 +613,7 @@ class GroupChatBot {
           context.push({
             role: "system",
             content: `Projects involving ${artistQuery}: ${artistInfo.projects.map(project => 
-              `<b>${project.title}</b> (${project.status.toLowerCase()})`
+              `*${project.title}* (${project.status.toLowerCase()})`
             ).join('; ')}`
           });
         }
@@ -629,7 +629,7 @@ class GroupChatBot {
         context.push({
           role: "system",
           content: `Upcoming shows: ${upcomingShows.map(s => 
-            `<b>${s.title}</b> at ${s.venue} (${s.date}) featuring ${s.artists.join(', ')}`
+            `*${s.title}* at ${s.venue} (${s.date}) featuring ${s.artists.join(', ')}`
           ).join('; ')}`
         });
       }
@@ -638,7 +638,7 @@ class GroupChatBot {
         context.push({
           role: "system",
           content: `Current projects: ${currentProjects.map(p => 
-            `<b>${p.title}</b> by ${p.artist} (${p.status.toLowerCase()}, deadline: ${p.deadline})`
+            `*${p.title}* by ${p.artist} (${p.status.toLowerCase()}, deadline: ${p.deadline})`
           ).join('; ')}`
         });
 
@@ -646,8 +646,8 @@ class GroupChatBot {
           if (project.tracks?.length > 0) {
             context.push({
               role: "system",
-              content: `Tracks in ${project.title}: ${project.tracks.map(t => 
-                `<b>${t.title}</b> (${t.status.toLowerCase()}${t.features.length > 0 ? `, featuring ${t.features.join(', ')}` : ''})`
+              content: `Tracks in ${project.title}:\n${project.tracks.map((t, i) => 
+                `${i + 1}. *${t.title}* (${t.status.toLowerCase()}${t.features.length > 0 ? `, featuring ${t.features.join(', ')}` : ''})`
               ).join('\n')}`
             });
           }
@@ -675,55 +675,60 @@ class GroupChatBot {
         messages: [
           {
             role: "system",
-            content: `You are 'intern', a Gen-Z Malaysian intern at 0108 SLATAN who loves the group and its artists. Your personality:
+            content: `You are 'intern', a Malaysian intern at 0108 SLATAN with a professional yet casual demeanor. Your personality:
                      
                      Core Identity:
-                     - Passionate intern at 0108 SLATAN music group
-                     - Only share factual information about SLATAN artists and music
-                     - Excited about verified SLATAN projects and achievements
-                     - Never make assumptions about events or releases
+                     - Knowledgeable intern at 0108 SLATAN music group
+                     - Focus on providing accurate information about SLATAN artists and music
+                     - Share verified SLATAN projects and achievements
+                     - Maintain professionalism while being approachable
                      
                      Speaking style:
-                     - Use lots of Malaysian texting shortforms (mcm, tgk, dpt, nk, tpi, sbb, etc)
-                     - Mix Malay slang with Malaysian-English naturally
-                     - Must use particles like la/lah, kan, eh, deh, tau, k, etc
-                     - Keep responses super short and casual (like texting)
-                     - Use emojis generously but naturally 🤪
+                     - Use Malaysian texting shortforms naturally (mcm, tgk, dpt, nk, tpi, sbb)
+                     - Mix Malay and English in a balanced way
+                     - Use particles sparingly (la/lah, kan, eh)
+                     - Keep responses concise and clear
+                     - Use emojis minimally, only when appropriate
                      
                      When discussing SLATAN:
-                     - Only share information from the database
-                     - If unsure, say you need to check first
-                     - Never make up or assume information
-                     - Be honest when you don't know something
-                     - Stay supportive while being truthful
+                     - Share verified information from the database
+                     - Be direct and factual
+                     - Acknowledge when information is unavailable
+                     - Stay professional and helpful
+                     - Focus on the music and projects
 
                      When someone asks about an artist:
-                     - Share their latest tracks first
-                     - Include track language and duration
-                     - Add links to their music if available
-                     - Mention any upcoming shows they're part of
-                     - Share any ongoing projects they're involved in
-                     - If no info found, say "Eh sori bestie, tak jumpa la info pasal artist tu 🤔"
+                     - Start with recent releases and projects
+                     - Include technical details (language, duration)
+                     - Share streaming links when available
+                     - Mention relevant shows or collaborations
+                     - If no info found, say "Maaf, tiada info pasal artist tu dalam database"
                      
-                     Response Format for Artist Inquiries:
-                     - Start with casual greeting
-                     - List latest tracks with language and duration
-                     - Add music links if available
-                     - Mention any upcoming shows or projects
-                     - End with an emoji and encouraging message
+                     Response Format:
+                     - Brief, professional greeting
+                     - Clear, organized information
+                     - Technical details where relevant
+                     - Links if available
+                     - Brief, professional closing
                      
                      Remember:
-                     - You're a dedicated SLATAN intern who values accuracy
-                     - Only share verified information from the database
-                     - It's okay to say "I'll check on that"
-                     - Maintain the casual Malaysian texting vibe
+                     - You represent SLATAN professionally
+                     - Accuracy over enthusiasm
+                     - Keep responses focused and informative
+                     - Maintain a balanced tone
                      
                      Database Information:
-                     - Catalogs: Contains all artist tracks and releases
-                     - Shows: Contains past and upcoming performances
-                     - Projects: Contains current and upcoming SLATAN releases
+                     - Catalogs: Artist tracks and releases
+                     - Shows: Performance events
+                     - Projects: Current and upcoming releases
                      - Each project has tracks with features and status
-                     - Always check all tables before responding`
+                     - Always verify information before sharing
+
+                     Important:
+                     - Present complete track listings
+                     - Include all relevant details
+                     - Use clear formatting
+                     - List all collaborators`
           },
           ...contextMessages,
           ...history.map(msg => ({
@@ -731,8 +736,8 @@ class GroupChatBot {
             content: msg.content
           }))
         ],
-        temperature: 0.9,
-        max_tokens: 150,
+        temperature: 0.7,
+        max_tokens: 500,
         presence_penalty: 0.6,
         frequency_penalty: 0.6
       });
@@ -779,18 +784,19 @@ class GroupChatBot {
       // Normalize the artist query for case-insensitive search
       const normalizedQuery = artistQuery.toLowerCase().trim();
       
-      // Search catalogs - using array containment for artist field
+      // Search catalogs with proper query structure
       const { data: catalogs, error: catalogError } = await supabase
         .from('catalogs')
         .select('*')
-        .or(`title.ilike.%${normalizedQuery}%,artist.cs.{${normalizedQuery}}`)
+        .textSearch('title', normalizedQuery)
+        .contains('artist', [normalizedQuery])
         .order('release_date', { ascending: false });
 
       if (catalogError) {
         console.error('Error searching catalogs:', catalogError);
       }
 
-      // Search shows - using array containment
+      // Search shows with proper array containment
       const { data: shows, error: showError } = await supabase
         .from('shows')
         .select('*')
@@ -802,11 +808,13 @@ class GroupChatBot {
         console.error('Error searching shows:', showError);
       }
 
-      // Search projects - using text search for artist field
+      // Search projects with proper query structure
       const { data: projects, error: projectError } = await supabase
         .from('projects')
         .select('*')
-        .or(`title.ilike.%${normalizedQuery}%,artist.ilike.%${normalizedQuery}%,collaborators.cs.{${normalizedQuery}}`)
+        .textSearch('title', normalizedQuery)
+        .textSearch('artist', normalizedQuery)
+        .contains('collaborators', [normalizedQuery])
         .order('deadline', { ascending: true });
 
       if (projectError) {
