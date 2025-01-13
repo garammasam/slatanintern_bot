@@ -169,49 +169,59 @@ class GroupChatBot {
         }
 
         console.log('Found kick poll info:', kickInfo);
-        const [chatId, { userId }] = kickInfo;
+        const [chatId, pollInfo] = kickInfo;
         
-        // Check if poll is closed
-        if (ctx.poll.is_closed) {
-          const totalVotes = ctx.poll.total_voter_count;
-          const kickVotes = ctx.poll.options[0].voter_count; // First option is "Kick"
-          
-          console.log('Processing closed kick poll:', {
-            chatId,
-            userId,
-            totalVotes,
-            kickVotes,
-            options: ctx.poll.options
-          });
-
-          // If more than 50% voted to kick
-          if (totalVotes > 0 && kickVotes > totalVotes / 2) {
-            try {
-              console.log('Attempting to kick user:', userId);
-              
-              // First try to kick
-              await ctx.api.banChatMember(chatId, userId, {
-                until_date: Math.floor(Date.now() / 1000) + 60 // Ban for 1 minute
-              });
-              
-              // Then unban to allow them to rejoin
-              await ctx.api.unbanChatMember(chatId, userId);
-              
-              await ctx.api.sendMessage(chatId, `User dah kena kick sebab ramai vote ✅ (${kickVotes}/${totalVotes} votes)`);
-              console.log('User kicked successfully');
-            } catch (error) {
-              console.error('Error kicking user:', error);
-              await ctx.api.sendMessage(chatId, 'Eh sori, tak dapat nak kick 😅 Check bot permissions k?');
+        // If poll is closed or has enough votes to kick
+        if (ctx.poll.is_closed || (ctx.poll.total_voter_count > 0 && ctx.poll.options[0].voter_count > ctx.poll.total_voter_count / 2)) {
+          try {
+            // Clear the timeout since we're processing now
+            if (pollInfo.timer) {
+              clearTimeout(pollInfo.timer);
             }
-          } else {
-            console.log('Not enough votes to kick');
-            await ctx.api.sendMessage(chatId, `Tak cukup votes untuk kick 🤷‍♂️ (${kickVotes}/${totalVotes} votes)`);
+
+            const totalVotes = ctx.poll.total_voter_count;
+            const kickVotes = ctx.poll.options[0].voter_count;
+
+            // If more than 50% voted to kick
+            if (totalVotes > 0 && kickVotes > totalVotes / 2) {
+              try {
+                console.log('Executing kick for user:', pollInfo.userId);
+                
+                // First try to kick
+                await ctx.api.banChatMember(chatId, pollInfo.userId, {
+                  until_date: Math.floor(Date.now() / 1000) + 60 // Ban for 1 minute
+                });
+                
+                // Then unban to allow them to rejoin
+                await ctx.api.unbanChatMember(chatId, pollInfo.userId);
+                
+                await ctx.api.sendMessage(chatId, `User dah kena kick sebab ramai vote ✅ (${kickVotes}/${totalVotes} votes)`);
+                console.log('User kicked successfully');
+              } catch (error) {
+                console.error('Error executing kick:', error);
+                await ctx.api.sendMessage(chatId, 'Eh sori, tak dapat nak kick 😅 Check bot permissions k?');
+              }
+            } else {
+              console.log('Not enough votes to kick');
+              await ctx.api.sendMessage(chatId, `Tak cukup votes untuk kick 🤷‍♂️ (${kickVotes}/${totalVotes} votes)`);
+            }
+
+            // Try to stop the poll if it's not already closed
+            if (!ctx.poll.is_closed) {
+              try {
+                await ctx.api.stopPoll(chatId, pollInfo.messageId);
+              } catch (error: any) {
+                console.log('Poll already closed or cannot be stopped:', error.message);
+              }
+            }
+
+            // Remove poll from tracking
+            this.kickPolls.delete(chatId);
+          } catch (error) {
+            console.error('Error processing kick action:', error);
           }
-          
-          // Remove poll from tracking
-          this.kickPolls.delete(chatId);
         } else {
-          console.log('Poll still open, waiting for more votes');
+          console.log('Poll still open, waiting for more votes or timer');
         }
       } catch (error) {
         console.error('Error handling poll answer:', error);
