@@ -498,7 +498,7 @@ class GroupChatBot {
       if (query) {
         const response = await this.handleArtistInquiry(query);
         await ctx.reply(response, { 
-          parse_mode: 'Markdown',
+          parse_mode: 'MarkdownV2',
           disable_web_page_preview: true 
         } as any);
         return;
@@ -601,10 +601,8 @@ class GroupChatBot {
   }
 
   private escapeMarkdown(text: string): string {
-    // Characters that need to be escaped in MarkdownV2: _ * [ ] ( ) ~ ` > # + - = | { } . !
-    const escaped = text.replace(/([_*[\]()~`>#+=|{}.!-])/g, '\\$1');
-    // Also escape any backslashes that aren't already escaping special characters
-    return escaped.replace(/\\([^_*[\]()~`>#+=|{}.!-])/g, '\\\\$1');
+    // Escape special characters for MarkdownV2
+    return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
   }
 
   private async enrichResponseContext(groupId: string): Promise<any[]> {
@@ -894,34 +892,34 @@ class GroupChatBot {
       const { catalogs, shows, projects } = await this.searchArtistInfo(query);
 
       // Format response with markdown escaping
-      let response = `Wasup gang! Ni info *${this.escapeMarkdown(query)}* yg aku jumpa:\n\n`;
+      let response = `Wasup gang\\! Ni info *${this.escapeMarkdown(query)}* yg aku jumpa:\\n\\n`;
       
       if (catalogs?.length) {
-        response += `🎵 *Releases* (${catalogs.length} tracks):\n`;
+        response += `🎵 *Releases* \\(${catalogs.length} tracks\\):\\n`;
         catalogs.slice(0, 5).forEach(track => {
           const title = this.escapeMarkdown(track.title);
           const date = this.escapeMarkdown(track.release_date || '');
           const duration = this.escapeMarkdown(track.duration || '');
-          response += `- *${title}* (${date}) - ${duration}\n`;
+          response += `\\- *${title}* \\(${date}\\) \\- ${duration}\\n`;
         });
-        if (catalogs.length > 5) response += `_... + ${catalogs.length - 5} more tracks_\n`;
-        response += '\n';
+        if (catalogs.length > 5) response += `_\\.\\.\\. \\+ ${catalogs.length - 5} more tracks_\\n`;
+        response += '\\n';
       }
 
       if (shows?.length) {
-        response += `🎪 *Shows* (${shows.length}):\n`;
+        response += `🎪 *Shows* \\(${shows.length}\\):\\n`;
         shows.slice(0, 3).forEach(show => {
           const title = this.escapeMarkdown(show.title);
           const venue = this.escapeMarkdown(show.venue);
           const date = this.escapeMarkdown(show.date);
-          response += `- *${title}* kt ${venue} (${date})\n`;
+          response += `\\- *${title}* kt ${venue} \\(${date}\\)\\n`;
         });
-        if (shows.length > 3) response += `_... + ${shows.length - 3} more shows otw_\n`;
-        response += '\n';
+        if (shows.length > 3) response += `_\\.\\.\\. \\+ ${shows.length - 3} more shows otw_\\n`;
+        response += '\\n';
       }
 
       if (projects?.length) {
-        response += `🎹 *Projects* (${projects.length}):\n`;
+        response += `🎹 *Projects* \\(${projects.length}\\):\\n`;
         projects.slice(0, 3).forEach(project => {
           const status = project.status === 'IN_PROGRESS' ? '🔄' : '✅';
           const title = this.escapeMarkdown(project.title);
@@ -938,7 +936,7 @@ class GroupChatBot {
               features: track.features
             }));
           
-          response += `- ${status} *${title}* (${genre})\n`;
+          response += `\\- ${status} *${title}* \\(${genre}\\)\\n`;
           if (featuredTracks.length) {
             featuredTracks.forEach((track: TrackInfo) => {
               const trackTitle = this.escapeMarkdown(track.title);
@@ -946,7 +944,7 @@ class GroupChatBot {
               const features = track.features
                 .filter((f: string) => f.toLowerCase() !== query.toLowerCase())
                 .map((f: string) => this.escapeMarkdown(f))
-                .join(', ');
+                .join('\\, ');
               
               // Convert status to street style
               const streetStatus = trackStatus === 'mixing' ? 'otw mix' : 
@@ -954,30 +952,30 @@ class GroupChatBot {
                                  trackStatus === 'mastering' ? 'otw master' : 
                                  'writing';
               
-              response += `  • *${trackTitle}* (${streetStatus}) ft. ${features}\n`;
+              response += `  • *${trackTitle}* \\(${streetStatus}\\) ft\\. ${features}\\n`;
             });
           }
         });
-        if (projects.length > 3) response += `_... + ${projects.length - 3} more projects otw_\n`;
+        if (projects.length > 3) response += `_\\.\\.\\. \\+ ${projects.length - 3} more projects otw_\\n`;
       }
 
       if (!catalogs?.length && !shows?.length && !projects?.length) {
-        return `Eh bro, xde la pulak info pasal "*${this.escapeMarkdown(query)}*" dalam database ni. Nanti kalau ada update aku bagitau k!`;
+        return `Eh bro\\, xde la pulak info pasal *${this.escapeMarkdown(query)}* dalam database ni\\. Nanti kalau ada update aku bagitau k\\!`;
       }
 
       // Add random closing messages
       const closings = [
-        "\nStay tune gang! More 🔥 otw!",
-        "\nTggu je updates baru gang! 💯",
-        "\nNanti ada update baru aku bagitau k! 🔥",
-        "\nKeep supporting local scene gang! 🙌"
+        "\\nStay tune gang\\! More 🔥 otw\\!",
+        "\\nTggu je updates baru gang\\! 💯",
+        "\\nNanti ada update baru aku bagitau k\\! 🔥",
+        "\\nKeep supporting local scene gang\\! 🙌"
       ];
       response += closings[Math.floor(Math.random() * closings.length)];
       
       return response;
     } catch (error) {
       console.error('Error in artist inquiry:', error);
-      return 'Alamak gang, ada error ni. Cuba lagi sekali k!';
+      return 'Alamak gang\\, ada error ni\\. Cuba lagi sekali k\\!';
     }
   }
 
