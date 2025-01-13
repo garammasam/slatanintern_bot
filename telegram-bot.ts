@@ -460,7 +460,9 @@ class GroupChatBot {
       if (response) {
         // Add some human-like delay
         await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-        await ctx.reply(response);
+        await ctx.reply(response, {
+          parse_mode: 'HTML' // Enable HTML parsing for formatting
+        });
         
         // Update history with bot's response
         this.updateMessageHistory(groupId, {
@@ -499,7 +501,8 @@ class GroupChatBot {
         await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
         console.log('Sending response:', response);
         await ctx.reply(response, {
-          reply_to_message_id: ctx.message.message_id
+          reply_to_message_id: ctx.message.message_id,
+          parse_mode: 'HTML' // Enable HTML parsing for formatting
         });
         
         // Update history with bot's response
@@ -588,7 +591,7 @@ class GroupChatBot {
           context.push({
             role: "system",
             content: `Catalog tracks by ${artistQuery}: ${artistInfo.catalogs.map(track => 
-              `${track.title} (${track.language}, ${track.duration}${track.link ? `, ${track.link}` : ''})`
+              `<b>${track.title}</b> (${track.language}, ${track.duration}${track.link ? `, ${track.link}` : ''})`
             ).join('; ')}`
           });
         } else {
@@ -600,7 +603,7 @@ class GroupChatBot {
           context.push({
             role: "system",
             content: `Shows featuring ${artistQuery}: ${artistInfo.shows.map(show => 
-              `${show.title} at ${show.venue} (${show.date})`
+              `<b>${show.title}</b> at ${show.venue} (${show.date})`
             ).join('; ')}`
           });
         }
@@ -610,7 +613,7 @@ class GroupChatBot {
           context.push({
             role: "system",
             content: `Projects involving ${artistQuery}: ${artistInfo.projects.map(project => 
-              `${project.title} (${project.status.toLowerCase()})`
+              `<b>${project.title}</b> (${project.status.toLowerCase()})`
             ).join('; ')}`
           });
         }
@@ -626,7 +629,7 @@ class GroupChatBot {
         context.push({
           role: "system",
           content: `Upcoming shows: ${upcomingShows.map(s => 
-            `${s.title} at ${s.venue} (${s.date}) featuring ${s.artists.join(', ')}`
+            `<b>${s.title}</b> at ${s.venue} (${s.date}) featuring ${s.artists.join(', ')}`
           ).join('; ')}`
         });
       }
@@ -635,7 +638,7 @@ class GroupChatBot {
         context.push({
           role: "system",
           content: `Current projects: ${currentProjects.map(p => 
-            `${p.title} by ${p.artist} (${p.status.toLowerCase()}, deadline: ${p.deadline})`
+            `<b>${p.title}</b> by ${p.artist} (${p.status.toLowerCase()}, deadline: ${p.deadline})`
           ).join('; ')}`
         });
 
@@ -644,8 +647,8 @@ class GroupChatBot {
             context.push({
               role: "system",
               content: `Tracks in ${project.title}: ${project.tracks.map(t => 
-                `${t.title} (${t.status.toLowerCase()}${t.features.length > 0 ? `, featuring ${t.features.join(', ')}` : ''})`
-              ).join('; ')}`
+                `<b>${t.title}</b> (${t.status.toLowerCase()}${t.features.length > 0 ? `, featuring ${t.features.join(', ')}` : ''})`
+              ).join('\n')}`
             });
           }
         });
@@ -776,18 +779,18 @@ class GroupChatBot {
       // Normalize the artist query for case-insensitive search
       const normalizedQuery = artistQuery.toLowerCase().trim();
       
-      // Search catalogs
+      // Search catalogs - using array containment for artist field
       const { data: catalogs, error: catalogError } = await supabase
         .from('catalogs')
         .select('*')
-        .or(`artist.ilike.%${normalizedQuery}%,title.ilike.%${normalizedQuery}%`)
+        .or(`title.ilike.%${normalizedQuery}%,artist.cs.{${normalizedQuery}}`)
         .order('release_date', { ascending: false });
 
       if (catalogError) {
         console.error('Error searching catalogs:', catalogError);
       }
 
-      // Search shows
+      // Search shows - using array containment
       const { data: shows, error: showError } = await supabase
         .from('shows')
         .select('*')
@@ -799,11 +802,11 @@ class GroupChatBot {
         console.error('Error searching shows:', showError);
       }
 
-      // Search projects
+      // Search projects - using text search for artist field
       const { data: projects, error: projectError } = await supabase
         .from('projects')
         .select('*')
-        .or(`artist.ilike.%${normalizedQuery}%,title.ilike.%${normalizedQuery}%`)
+        .or(`title.ilike.%${normalizedQuery}%,artist.ilike.%${normalizedQuery}%,collaborators.cs.{${normalizedQuery}}`)
         .order('deadline', { ascending: true });
 
       if (projectError) {
