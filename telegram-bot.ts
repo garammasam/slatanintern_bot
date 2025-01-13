@@ -654,7 +654,7 @@ const botConfig: BotConfig = {
   telegramToken: process.env.TELEGRAM_TOKEN || '',
   openaiKey: process.env.OPENAI_API_KEY || '',
   groupIds: (process.env.GROUP_IDS || '').split(','),
-  responseThreshold: Number(process.env.RESPONSE_THRESHOLD || 0.3),
+  responseThreshold: Number(process.env.RESPONSE_THRESHOLD || 0.7),
   messageHistory: new Map()
 };
 
