@@ -11,14 +11,15 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
+COPY tsconfig.json ./
 
-# Install dependencies with verbose logging
-RUN npm install --verbose
+# Install dependencies
+RUN npm ci
 
-# Copy rest of the application
+# Copy source code
 COPY . .
 
-# Build the application
+# Build TypeScript
 RUN npm run build
 
 # Expose the port the app runs on

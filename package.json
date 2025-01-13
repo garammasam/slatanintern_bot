@@ -4,10 +4,10 @@
   "description": "A Telegram group chat bot powered by GPT-4",
   "main": "dist/telegram-bot.js",
   "scripts": {
-    "build": "tsc",
+    "prebuild": "rm -rf dist",
+    "build": "tsc -p tsconfig.json",
     "start": "node dist/telegram-bot.js",
-    "dev": "ts-node telegram-bot.ts",
-    "postinstall": "npm run build"
+    "dev": "ts-node telegram-bot.ts"
   },
   "dependencies": {
     "grammy": "^1.21.1",
