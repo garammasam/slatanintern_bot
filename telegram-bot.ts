@@ -70,6 +70,20 @@ interface SocialKeyword {
   regex: RegExp;
 }
 
+// Add new interfaces for slang handling
+interface SlangEntry {
+  word: string;
+  meaning: string;
+  context: string;
+  category: 'callout' | 'agreement' | 'disagreement' | 'praise' | 'criticism' | 'general';
+  examples: string[];
+  responses: string[];
+}
+
+interface SlangDatabase {
+  [key: string]: SlangEntry;
+}
+
 // Create a simple HTTP server for health checks
 const server = http.createServer((req, res) => {
   if (req.url === '/health') {
@@ -161,6 +175,85 @@ class GroupChatBot {
   private socialKeywords: SocialKeyword = {
     words: ['ig', 'instagram', 'insta', 'social', 'socmed', 'media', 'follow'],
     regex: /\b(ig|instagram|insta|social|socmed|media|follow)\b/i
+  };
+  private slangDB: SlangDatabase = {
+    // Callouts/Disagreements
+    'lipak': {
+      word: 'lipak',
+      meaning: 'calling out lies or exaggeration',
+      context: 'Used when someone is not being truthful or exaggerating',
+      category: 'callout',
+      examples: ['lipak gile', 'lipak je', 'jangan lipak'],
+      responses: [
+        'Haha sori2, mbo mengada sikit tadi 😅',
+        'Yelah, mbo admit la tadi tu lebih sikit 😅',
+        'Ok ok mbo mengaku, tadi tu lebih sikit 🙏',
+        'Hehe ketahuan pulak mbo ni 😅'
+      ]
+    },
+    'cap': {
+      word: 'cap',
+      meaning: 'lying or not telling truth',
+      context: 'Used to call out untruths or exaggerations',
+      category: 'callout',
+      examples: ['cap la', 'no cap', 'jangan cap'],
+      responses: [
+        'Eh sori2, mbo tak bermaksud nak cap 😅',
+        'Ok la, mbo tak cap dah lepas ni 🙏',
+        'Haha mbo kena tegur, sori ah 😅'
+      ]
+    },
+    'mengada': {
+      word: 'mengada',
+      meaning: 'being fake or pretentious',
+      context: 'Used when someone is being inauthentic',
+      category: 'callout',
+      examples: ['jangan mengada', 'mengada je ni', 'mengada la pulak'],
+      responses: [
+        'Yelah, mbo mengaku mengada sikit tadi 😅',
+        'Haha sori2, terlebih sikit tadi 🙏',
+        'Ok ok, mbo tak mengada dah 😅'
+      ]
+    },
+    // Agreements/Positive
+    'betul': {
+      word: 'betul',
+      meaning: 'agreeing or confirming',
+      context: 'Used to show agreement',
+      category: 'agreement',
+      examples: ['betul tu', 'betul betul', 'memang betul'],
+      responses: [
+        'Kan? Mbo pun rasa macam tu gak!',
+        'Ya, memang betul la tu',
+        'Setuju sangat dengan ni!'
+      ]
+    },
+    // Criticism
+    'cringe': {
+      word: 'cringe',
+      meaning: 'embarrassing or awkward',
+      context: 'Used to criticize something awkward',
+      category: 'criticism',
+      examples: ['cringe gile', 'cringe siot', 'cringe la pulak'],
+      responses: [
+        'Haha sori2 kalau cringe 😅',
+        'Yelah, mbo pun rasa cringe gak tadi 😅',
+        'Ok ok, kurangkan cringe sikit lepas ni 🙏'
+      ]
+    },
+    // Praise
+    'power': {
+      word: 'power',
+      meaning: 'amazing or impressive',
+      context: 'Used to praise something',
+      category: 'praise',
+      examples: ['power gile', 'power la', 'power betul'],
+      responses: [
+        'Kan? Memang power gile!',
+        'Ya, mbo pun rasa power gak!',
+        'Power sangat la kan!'
+      ]
+    }
   };
   
   constructor(config: BotConfig) {
@@ -718,27 +811,45 @@ class GroupChatBot {
         }
       }
 
-      // Add common Malaysian slang understanding
-      const slangContext = {
-        "lipak": "calling someone out for lying/capping",
-        "cap": "lying/not telling truth",
-        "mengada": "being fake/pretentious",
-        "tipu": "lying",
-        "bohong": "lying",
-        "sembang": "just talking/chatting nonsense",
-        "membawang": "gossiping/talking nonsense"
-      };
-
-      // Check if the message contains any slang calling out the bot
+      // Check for slang in the message
       const messageLower = lastMessage?.content.toLowerCase() || '';
-      for (const [slang, meaning] of Object.entries(slangContext)) {
-        if (messageLower.includes(slang)) {
+      let slangFound = false;
+
+      // First, check for exact matches
+      for (const [key, slang] of Object.entries(this.slangDB)) {
+        if (messageLower.includes(key)) {
           context.push({
             role: "system",
-            content: `The user just used the word "${slang}" which means "${meaning}". They might be calling you out or disagreeing with your previous statement. Respond appropriately and honestly.`
+            content: `The user used the slang "${slang.word}" which means "${slang.meaning}". Context: ${slang.context}. Category: ${slang.category}. Here are appropriate responses you can base yours on: ${slang.responses.join(" | ")}`
           });
+          slangFound = true;
           break;
         }
+      }
+
+      // If no exact match, check for similar patterns
+      if (!slangFound) {
+        for (const [key, slang] of Object.entries(this.slangDB)) {
+          for (const example of slang.examples) {
+            if (messageLower.includes(example)) {
+              context.push({
+                role: "system",
+                content: `The user used a phrase similar to "${slang.word}" (specifically: "${example}"). This usually means "${slang.meaning}". Context: ${slang.context}. Category: ${slang.category}. Here are appropriate responses you can base yours on: ${slang.responses.join(" | ")}`
+              });
+              slangFound = true;
+              break;
+            }
+          }
+          if (slangFound) break;
+        }
+      }
+
+      // Add general context about being called out
+      if (slangFound && ['callout', 'criticism'].includes(this.slangDB[messageLower]?.category)) {
+        context.push({
+          role: "system",
+          content: `The user is calling you out or criticizing your previous response. Be humble, admit if you were wrong or exaggerating, and respond appropriately. Don't be defensive or continue with the previous narrative.`
+        });
       }
 
       // Enhanced pattern matching for artist inquiries - extract just the artist name
