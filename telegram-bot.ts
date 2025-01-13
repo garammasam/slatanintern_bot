@@ -3,6 +3,7 @@ import { OpenAI } from 'openai';
 import { config } from 'dotenv';
 import * as http from 'http';
 import { createClient } from '@supabase/supabase-js';
+import * as fs from 'fs/promises';
 
 // Load environment variables
 config();
@@ -96,6 +97,18 @@ interface Event {
   description?: string;
   location?: string;
   status: 'upcoming' | 'past' | 'cancelled';
+}
+
+interface CatalogTrack {
+  id: string;
+  title: string;
+  artist: string[];
+  language: string;
+  duration: string;
+  release_date: string;
+  isrc: string;
+  link?: string;
+  type: string;
 }
 
 // Create a simple HTTP server for health checks
@@ -750,22 +763,61 @@ class GroupChatBot {
     }
   }
 
-  // Add method to search for specific artist info
-  private async searchArtistInfo(artist: string): Promise<{shows: Show[], projects: Project[]}> {
-    const [shows, projects] = await Promise.all([
-      this.getShows().then(shows => 
-        shows.filter(show => show.artists.some(a => a.toLowerCase().includes(artist.toLowerCase())))
-      ),
-      this.getProjects().then(projects => 
-        projects.filter(project => 
-          project.tracks.some(track => 
-            track.features.some(f => f.toLowerCase().includes(artist.toLowerCase()))
-          )
-        )
-      )
+  private async loadCatalogData(): Promise<CatalogTrack[]> {
+    try {
+      const csvData = await fs.readFile('catalogs_rows.csv', 'utf-8');
+      const rows = csvData.split('\n').slice(1); // Skip header
+      return rows.map(row => {
+        const [id, title, artistStr, language, duration, release_date, isrc, , , link] = row.split(',');
+        return {
+          id,
+          title,
+          artist: JSON.parse(artistStr || '[]'),
+          language,
+          duration,
+          release_date,
+          isrc,
+          link,
+          type: 'Original'
+        };
+      }).filter(track => track.id); // Filter out empty rows
+    } catch (error) {
+      console.error('Error loading catalog data:', error);
+      return [];
+    }
+  }
+
+  private async searchArtistInfo(artistQuery: string): Promise<{
+    shows: Show[],
+    projects: Project[],
+    catalogs: CatalogTrack[]
+  }> {
+    const [shows, projects, catalogData] = await Promise.all([
+      this.getShows(),
+      this.getProjects(),
+      this.loadCatalogData()
     ]);
 
-    return { shows, projects };
+    const normalizedQuery = artistQuery.toLowerCase().trim();
+    
+    const filteredShows = shows.filter(show => 
+      show.artists.some(artist => artist.toLowerCase().includes(normalizedQuery))
+    );
+
+    const filteredProjects = projects.filter(project =>
+      project.artist.toLowerCase().includes(normalizedQuery) ||
+      project.collaborators.some(collab => collab.toLowerCase().includes(normalizedQuery))
+    );
+
+    const filteredCatalogs = catalogData.filter(track =>
+      track.artist.some(artist => artist.toLowerCase().includes(normalizedQuery))
+    );
+
+    return {
+      shows: filteredShows,
+      projects: filteredProjects,
+      catalogs: filteredCatalogs
+    };
   }
 
   public async start() {
