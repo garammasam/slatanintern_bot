@@ -289,19 +289,20 @@ class GroupChatBot {
       
       if (!userId || !groupId) return;
 
-      // Check user rate limit
-      if (!this.canUserSendMessage(userId) && !ctx.message?.text?.includes('@' + ctx.me.username)) {
+      const isMentioned = ctx.message?.text?.includes('@' + ctx.me.username);
+      const isReplyToBot = ctx.message?.reply_to_message?.from?.id === ctx.me.id;
+      
+      // Check user rate limit (bypass for mentions and direct replies)
+      if (!this.canUserSendMessage(userId) && !isMentioned && !isReplyToBot) {
         console.log('User rate limited:', userId);
         return;
       }
 
-      // Check group rate limit
-      if (!this.canGroupReceiveResponse(groupId)) {
+      // Check group rate limit (bypass for mentions and direct replies)
+      if (!this.canGroupReceiveResponse(groupId) && !isMentioned && !isReplyToBot) {
         console.log('Group rate limited:', groupId);
         return;
       }
-
-      const isMentioned = ctx.message?.text?.includes('@' + ctx.me.username);
       
       console.log('Received message:', {
         chatId: groupId,
@@ -311,19 +312,20 @@ class GroupChatBot {
         messageFrom: ctx.message?.from?.username,
         messageText: ctx.message?.text,
         isMentioned: isMentioned,
+        isReplyToBot: isReplyToBot,
         botUsername: ctx.me.username
       });
 
       try {
-        // Always respond to mentions, otherwise use shouldRespond
-        if (isMentioned) {
-          console.log('Bot was mentioned, handling direct mention...');
+        // Always respond to mentions and direct replies, otherwise use shouldRespond
+        if (isMentioned || isReplyToBot) {
+          console.log('Bot was mentioned or directly replied to, handling direct response...');
           await this.handleDirectMention(ctx);
         } else if (this.shouldRespond(ctx)) {
           console.log('Random response triggered, handling group message...');
           await this.handleGroupMessage(ctx);
         } else {
-          console.log('Skipping response (not mentioned and random threshold not met)');
+          console.log('Skipping response (not mentioned/replied and random threshold not met)');
         }
       } catch (error) {
         console.error('Error in message handler:', error);
