@@ -449,9 +449,10 @@ class GroupChatBot {
       if (response) {
         // Add some human-like delay
         await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-        await ctx.reply(this.escapeMarkdown(response), {
-          parse_mode: 'MarkdownV2'
-        });
+        await ctx.reply(response, {
+          parse_mode: 'MarkdownV2',
+          disable_web_page_preview: true
+        } as any);
         
         // Update history with bot's response
         this.updateMessageHistory(groupId, {
@@ -579,8 +580,12 @@ class GroupChatBot {
   }
 
   private escapeMarkdown(text: string): string {
-    // Escape special characters for MarkdownV2
-    return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+    // First escape special regex characters
+    return text
+      .replace(/([_*\[\]()~`>#\+\-=|{}.!\\])/g, '\\$1') // Escape MarkdownV2 special characters
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 
   private async enrichResponseContext(groupId: string): Promise<any[]> {
@@ -870,7 +875,6 @@ class GroupChatBot {
         response += `${trackNum}\\. *${title}* \\- \\(${status}\\) FEATURING THE GOATS\\: ${features} SHEEEEESH\\!\\!\\! 🔥💯\\n`;
       });
 
-      // Add random closing messages
       const closings = [
         "\\n\\nBROOOO THIS PROJECT GONNA BE CRAZYYYY FR FR\\!\\!\\! 🔥🔥🔥 IM LITERALLY SHAKING RN NO CAP\\!\\!\\! 💀💀💀",
         "\\n\\nNAH FR THO THIS ONE DIFFERENT GANGGGG\\!\\!\\! 🤪🤪🤪 SUPPORT LOCAL SCENE OR UR NOT VALID FR FR\\!\\!\\! 💯💯💯",
