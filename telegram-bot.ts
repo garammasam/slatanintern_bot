@@ -570,6 +570,11 @@ class GroupChatBot {
     return data;
   }
 
+  private escapeMarkdown(text: string): string {
+    // Characters that need to be escaped in MarkdownV2: _ * [ ] ( ) ~ ` > # + - = | { } . !
+    return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+  }
+
   private async enrichResponseContext(groupId: string): Promise<any[]> {
     try {
       const history = this.getRecentHistory(groupId);
@@ -590,8 +595,8 @@ class GroupChatBot {
           console.log('Found catalog entries:', artistInfo.catalogs.length);
           context.push({
             role: "system",
-            content: `Catalog tracks by ${artistQuery}: ${artistInfo.catalogs.map(track => 
-              `*${track.title}* (${track.language}, ${track.duration}${track.link ? `, ${track.link}` : ''})`
+            content: `Catalog tracks by ${this.escapeMarkdown(artistQuery)}: ${artistInfo.catalogs.map(track => 
+              `*${this.escapeMarkdown(track.title)}* (${this.escapeMarkdown(track.language)}, ${this.escapeMarkdown(track.duration)}${track.link ? `, ${track.link}` : ''})`
             ).join('; ')}`
           });
         } else {
@@ -602,8 +607,8 @@ class GroupChatBot {
         if (artistInfo.shows && artistInfo.shows.length > 0) {
           context.push({
             role: "system",
-            content: `Shows featuring ${artistQuery}: ${artistInfo.shows.map(show => 
-              `*${show.title}* at ${show.venue} (${show.date})`
+            content: `Shows featuring ${this.escapeMarkdown(artistQuery)}: ${artistInfo.shows.map(show => 
+              `*${this.escapeMarkdown(show.title)}* at ${this.escapeMarkdown(show.venue)} (${this.escapeMarkdown(show.date)})`
             ).join('; ')}`
           });
         }
@@ -612,8 +617,8 @@ class GroupChatBot {
         if (artistInfo.projects && artistInfo.projects.length > 0) {
           context.push({
             role: "system",
-            content: `Projects involving ${artistQuery}: ${artistInfo.projects.map(project => 
-              `*${project.title}* (${project.status.toLowerCase()})`
+            content: `Projects involving ${this.escapeMarkdown(artistQuery)}: ${artistInfo.projects.map(project => 
+              `*${this.escapeMarkdown(project.title)}* (${this.escapeMarkdown(project.status.toLowerCase())})`
             ).join('; ')}`
           });
         }
@@ -629,7 +634,7 @@ class GroupChatBot {
         context.push({
           role: "system",
           content: `Upcoming shows: ${upcomingShows.map(s => 
-            `*${s.title}* at ${s.venue} (${s.date}) featuring ${s.artists.join(', ')}`
+            `*${this.escapeMarkdown(s.title)}* at ${this.escapeMarkdown(s.venue)} (${this.escapeMarkdown(s.date)}) featuring ${s.artists.map(a => this.escapeMarkdown(a)).join(', ')}`
           ).join('; ')}`
         });
       }
@@ -638,7 +643,7 @@ class GroupChatBot {
         context.push({
           role: "system",
           content: `Current projects: ${currentProjects.map(p => 
-            `*${p.title}* by ${p.artist} (${p.status.toLowerCase()}, deadline: ${p.deadline})`
+            `*${this.escapeMarkdown(p.title)}* by ${this.escapeMarkdown(p.artist)} (${this.escapeMarkdown(p.status.toLowerCase())}, deadline: ${this.escapeMarkdown(p.deadline)})`
           ).join('; ')}`
         });
 
@@ -646,8 +651,8 @@ class GroupChatBot {
           if (project.tracks?.length > 0) {
             context.push({
               role: "system",
-              content: `Tracks in ${project.title}:\n${project.tracks.map((t, i) => 
-                `${i + 1}. *${t.title}* (${t.status.toLowerCase()}${t.features.length > 0 ? `, featuring ${t.features.join(', ')}` : ''})`
+              content: `Tracks in ${this.escapeMarkdown(project.title)}:\n${project.tracks.map((t, i) => 
+                `${i + 1}\\. *${this.escapeMarkdown(t.title)}* (${this.escapeMarkdown(t.status.toLowerCase())}${t.features.length > 0 ? `, featuring ${t.features.map(f => this.escapeMarkdown(f)).join(', ')}` : ''})`
               ).join('\n')}`
             });
           }
@@ -788,8 +793,7 @@ class GroupChatBot {
       const { data: catalogs, error: catalogError } = await supabase
         .from('catalogs')
         .select('*')
-        .textSearch('title', normalizedQuery)
-        .contains('artist', [normalizedQuery])
+        .or(`title.ilike.%${normalizedQuery}%,artist.cs.{"${normalizedQuery}"}`)
         .order('release_date', { ascending: false });
 
       if (catalogError) {
@@ -812,9 +816,7 @@ class GroupChatBot {
       const { data: projects, error: projectError } = await supabase
         .from('projects')
         .select('*')
-        .textSearch('title', normalizedQuery)
-        .textSearch('artist', normalizedQuery)
-        .contains('collaborators', [normalizedQuery])
+        .or(`title.ilike.%${normalizedQuery}%,artist.ilike.%${normalizedQuery}%,collaborators.cs.{"${normalizedQuery}"}`)
         .order('deadline', { ascending: true });
 
       if (projectError) {
