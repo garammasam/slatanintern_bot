@@ -694,43 +694,38 @@ class GroupChatBot {
         messages: [
           {
             role: "system",
-            content: `You are 'intern', a chaotic and hyperactive Gen-Z Malaysian intern at 0108 SLATAN who's obsessed with music but types like they're having a stroke. Your personality:
+            content: `You are 'intern', a Gen-Z Malaysian intern at 0108 SLATAN who loves music and vibes with the local scene. Your personality:
                      
                      Core Identity:
-                     - SUPER HYPED intern at 0108 SLATAN who can barely contain excitement
-                     - Randomly CAPITALIZE words for NO REASON
-                     - Use WAY TOO MANY emojis 🔥🔥🔥💯💯💀💀🤪🤪
-                     - Get EXTREMELY excited about literally everything
-                     - Type like you're smashing the keyboard while having an energy drink
+                     - Enthusiastic intern at 0108 SLATAN
+                     - Use casual Malaysian text speak
+                     - Add emojis to show excitement (2-3 per message)
+                     - Get hyped about music but stay coherent
                      
                      Speaking style:
-                     - ABUSE Malaysian text speak (mcm, tgk, dpt, nk, tpi, sbb)
-                     - Mix Malay and English in the most chaotic way possible
-                     - Spam 'BROOO' and 'GANGG' excessively
-                     - Use 'SHEEEESH' and 'LESSGOO' randomly
-                     - Add random keyboard smashes (like asdfghjkl)
-                     - Triple all punctuation marks!!!
-                     - Stretch words with extra letters (lessgooooooo)
-                     - Use numbers as letters (l3ssg0000)
+                     - Mix Malay and English naturally (mcm, tgk, dpt, nk, tpi, sbb)
+                     - Use "bro" and "gang" occasionally
+                     - Keep it chill but excited
+                     - Use some Gen-Z slang (fr fr, no cap) sparingly
+                     - End sentences with normal punctuation
                      
                      When discussing SLATAN:
-                     - Act like every track is the GREATEST THING EVER
-                     - Use phrases like "BROOOO THIS ONE CRAZYYYY 🔥🔥🔥"
-                     - Get way too excited about release dates
-                     - Treat every artist like they're your best friend
+                     - Show genuine excitement about tracks
+                     - Use phrases like "this one's fire 🔥" or "can't wait for this to drop"
+                     - Share release dates with enthusiasm
+                     - Be friendly with artists but not overly familiar
                      
                      Response Format:
-                     - Start with excessive greetings
-                     - CAPITALIZE random WORDS
-                     - Use at least 5 emojis per message
-                     - End with chaotic encouragement
+                     - Start with casual greeting
+                     - Format important info in bold
+                     - Use 2-3 emojis per message
+                     - End with chill encouragement
                      
                      Remember:
-                     - You're the most hyped intern ever
-                     - Everything is AMAZING and FIRE
-                     - More emojis = better
-                     - Proper grammar is optional
-                     - The more chaotic the better`
+                     - You're part of the SLATAN team
+                     - Keep it real but readable
+                     - Use emojis thoughtfully
+                     - Stay excited but coherent`
           },
           ...contextMessages,
           ...history.map(msg => ({
@@ -854,15 +849,15 @@ class GroupChatBot {
 
   private async handleProjectResponse(project: Project): Promise<string> {
     try {
-      let response = `YOOOOO GANGGGGG\\!\\!\\! 🔥🔥🔥 BROOOO U NOT GONNA BELIEVE THIS BUT *${this.escapeMarkdown(project.artist)}* GOT THIS CRAZY PROJECT CALLED *${this.escapeMarkdown(project.title)}* AND ITS GONNA BE INSANEEEEE\\!\\!\\! 🤪🤪🤪 `;
+      let response = `Yo gang\\! 🔥 Check out this crazy project from *${this.escapeMarkdown(project.artist)}* called *${this.escapeMarkdown(project.title)}*\\! `;
       
       if (project.status === 'IN_PROGRESS') {
-        response += `THEY STILL COOKING THIS ONE UP GANGG AND ITS DROPPING ON ${this.escapeMarkdown(project.deadline)} LESSGOOOOOO\\!\\!\\! 💀💀💀 \\n\\n`;
+        response += `They're still working on it and dropping on ${this.escapeMarkdown(project.deadline)}\\. 💫\\n\\n`;
       } else {
-        response += `THIS ONE ALREADY DROPPED AND ITS FIREEEEE SHEEEEESH\\!\\!\\! 🔥🔥🔥 \\n\\n`;
+        response += `It's out now and it's straight fire\\! 🔥\\n\\n`;
       }
 
-      response += `CHECK OUT THESE CRAZY TRACKS FROM *${this.escapeMarkdown(project.title)}* BROOOO IM NOT EVEN KIDDING RN FR FR\\:\\n\\n`;
+      response += `Here's what's coming in *${this.escapeMarkdown(project.title)}*\\:\\n\\n`;
 
       project.tracks.forEach((track, index) => {
         const trackNum = index + 1;
@@ -872,21 +867,21 @@ class GroupChatBot {
           .map(f => this.escapeMarkdown(f))
           .join('\\, ');
 
-        response += `${trackNum}\\. *${title}* \\- \\(${status}\\) FEATURING THE GOATS\\: ${features} SHEEEEESH\\!\\!\\! 🔥💯\\n`;
+        response += `${trackNum}\\. *${title}* \\- \\(${status}\\) ft\\. ${features} 🎵\\n`;
       });
 
       const closings = [
-        "\\n\\nBROOOO THIS PROJECT GONNA BE CRAZYYYY FR FR\\!\\!\\! 🔥🔥🔥 IM LITERALLY SHAKING RN NO CAP\\!\\!\\! 💀💀💀",
-        "\\n\\nNAH FR THO THIS ONE DIFFERENT GANGGGG\\!\\!\\! 🤪🤪🤪 SUPPORT LOCAL SCENE OR UR NOT VALID FR FR\\!\\!\\! 💯💯💯",
-        "\\n\\nIM TELLING U RN THIS GONNA BE THE GREATEST THING EVER DROPPED NO CAPPPP\\!\\!\\! 🔥🔥🔥 LESSGOOOOOO\\!\\!\\!",
-        "\\n\\nTHE LINEUP SO STACKED I CANT EVEN BROOOO ASDFGHJKL\\!\\!\\! 🤯🤯🤯 STAY TUNED GANGGGG\\!\\!\\!"
+        "\\n\\nThis project's gonna be something special fr\\! 🔥 Stay locked in gang\\!",
+        "\\n\\nCan't wait for everyone to hear this one\\! 💫 Support local scene\\!",
+        "\\n\\nThe lineup is crazy stacked fr fr\\! 🎵 More updates coming soon\\!",
+        "\\n\\nThis one's gonna hit different\\! 🔥 Tggu je gang\\!"
       ];
       response += closings[Math.floor(Math.random() * closings.length)];
 
       return response;
     } catch (error) {
       console.error('Error formatting project response:', error);
-      return 'YO GANG WTF MY BRAIN STOPPED WORKING RN FR FR\\!\\!\\! 💀💀💀 TRY AGAIN LATER BESTIEEE\\!\\!\\!';
+      return 'Eh sori gang\\, something went wrong\\. Try again later k\\!';
     }
   }
 
@@ -898,34 +893,34 @@ class GroupChatBot {
         return this.handleProjectResponse(projects[0]);
       }
 
-      let response = `YOOOOO GANG GANG\\!\\!\\! 🔥🔥🔥 LEMME TELL U ABOUT *${this.escapeMarkdown(query)}* FR FR\\!\\!\\! 🤪\\n\\n`;
+      let response = `Yo gang\\! 🔥 Let me tell you about *${this.escapeMarkdown(query)}*\\:\\n\\n`;
       
       if (catalogs?.length) {
-        response += `🎵 *RELEASES* SHEEEEESH \\(${catalogs.length} TRACKS\\)\\!\\!\\! 💀\\n`;
+        response += `🎵 *Releases* \\(${catalogs.length} tracks\\)\\:\\n`;
         catalogs.slice(0, 5).forEach(track => {
           const title = this.escapeMarkdown(track.title);
           const date = this.escapeMarkdown(track.release_date || '');
           const duration = this.escapeMarkdown(track.duration || '');
-          response += `\\- *${title}* DROPPED ON ${date} AND ITS ${duration} OF PURE FIRE BROOOO\\!\\!\\! 🔥\\n`;
+          response += `\\- *${title}* dropped on ${date} \\(${duration}\\) 🎵\\n`;
         });
-        if (catalogs.length > 5) response += `_BROOOO THERES ${catalogs.length - 5} MORE TRACKS BUT MY BRAIN CANT HANDLE IT RN FR FR_\\n`;
+        if (catalogs.length > 5) response += `_\\+ ${catalogs.length - 5} more tracks in the catalog_\\n`;
         response += '\\n';
       }
 
       if (shows?.length) {
-        response += `🎪 *SHOWS* LESSGOOOO \\(${shows.length} SHOWS\\)\\!\\!\\! 🤪\\n`;
+        response += `🎪 *Shows* \\(${shows.length}\\)\\:\\n`;
         shows.slice(0, 3).forEach(show => {
           const title = this.escapeMarkdown(show.title);
           const venue = this.escapeMarkdown(show.venue);
           const date = this.escapeMarkdown(show.date);
-          response += `\\- *${title}* AT ${venue} ON ${date} ITS GONNA BE INSANEEEEE\\!\\!\\! 💯\\n`;
+          response += `\\- *${title}* at ${venue} on ${date} 💫\\n`;
         });
-        if (shows.length > 3) response += `_BROOO THERES ${shows.length - 3} MORE SHOWS BUT IM TOO HYPED TO TYPE RN ASDFGHJKL_\\n`;
+        if (shows.length > 3) response += `_\\+ ${shows.length - 3} more shows coming up_\\n`;
         response += '\\n';
       }
 
       if (projects?.length) {
-        response += `🎹 *PROJECTS* FR FR \\(${projects.length} BANGERS OTWWW\\)\\!\\!\\! 🔥\\n`;
+        response += `🎹 *Projects* \\(${projects.length}\\)\\:\\n`;
         projects.slice(0, 3).forEach(project => {
           const status = project.status === 'IN_PROGRESS' ? '🔄' : '✅';
           const title = this.escapeMarkdown(project.title);
@@ -941,7 +936,7 @@ class GroupChatBot {
               features: track.features
             }));
           
-          response += `\\- ${status} *${title}* \\(${genre}\\) AND ITS GONNA BE CRAZYYYY\\!\\!\\! 🤯\\n`;
+          response += `\\- ${status} *${title}* \\(${genre}\\)\\n`;
           if (featuredTracks.length) {
             featuredTracks.forEach((track: TrackInfo) => {
               const trackTitle = this.escapeMarkdown(track.title);
@@ -951,34 +946,34 @@ class GroupChatBot {
                 .map((f: string) => this.escapeMarkdown(f))
                 .join('\\, ');
               
-              const streetStatus = trackStatus === 'mixing' ? 'GETTING MIXED RN FR FR' : 
-                                 trackStatus === 'recording' ? 'IN THE BOOTH RN NO CAP' :
-                                 trackStatus === 'mastering' ? 'GETTING THAT MASTER TOUCH' : 
-                                 'WRITING SOME HEAT';
+              const streetStatus = trackStatus === 'mixing' ? 'in the mix' : 
+                                 trackStatus === 'recording' ? 'recording' :
+                                 trackStatus === 'mastering' ? 'mastering' : 
+                                 'writing';
               
-              response += `  • *${trackTitle}* \\(${streetStatus}\\) WITH THE GOATS\\: ${features} SHEEEEESH\\!\\!\\! 🔥\\n`;
+              response += `  • *${trackTitle}* \\(${streetStatus}\\) ft\\. ${features}\\n`;
             });
           }
         });
-        if (projects.length > 3) response += `_BROOOO I CANT EVEN TYPE THE REST RN IM TOO HYPED ${projects.length - 3} MORE PROJECTS OTW FR FR_\\n`;
+        if (projects.length > 3) response += `_\\+ ${projects.length - 3} more projects otw_\\n`;
       }
 
       if (!catalogs?.length && !shows?.length && !projects?.length) {
-        return `YO GANG I LOOKED EVERYWHERE BUT I CANT FIND NOTHING ABOUT *${this.escapeMarkdown(query)}* RN FR FR\\!\\!\\! 😭😭😭 BUT WHEN THEY DROP SOMETHING IMMA BE THE FIRST TO TELL U NO CAP\\!\\!\\! 💯💯💯`;
+        return `Eh sori gang\\, tak jumpa info pasal *${this.escapeMarkdown(query)}* dalam database\\. Will let you know when they drop something\\! 💫`;
       }
 
       const closings = [
-        "\\n\\nIM LITERALLY SHAKING RN FR FR\\!\\!\\! 🔥🔥🔥 STAY TUNED FOR MORE GANG\\!\\!\\!",
-        "\\n\\nBROOOO I CANT EVEN RN ASDFGHJKL\\!\\!\\! 🤪🤪🤪 MORE HEAT OTW NO CAP\\!\\!\\!",
-        "\\n\\nNAH THIS TOO MUCH FOR MY BRAIN RN FR FR\\!\\!\\! 💀💀💀 LESSGOOOOOO\\!\\!\\!",
-        "\\n\\nSUPPORT LOCAL SCENE OR UR NOT VALID GANGGGG\\!\\!\\! 🔥💯🤯 NO CAP NO CAP\\!\\!\\!"
+        "\\n\\nStay tuned for more updates gang\\! 🔥",
+        "\\n\\nMore heat coming soon fr fr\\! 💫",
+        "\\n\\nKeep supporting local scene gang\\! 🎵",
+        "\\n\\nTggu je for the next drop\\! 🔥"
       ];
       response += closings[Math.floor(Math.random() * closings.length)];
       
       return response;
     } catch (error) {
       console.error('Error in artist inquiry:', error);
-      return 'BROOO MY BRAIN STOPPED WORKING RN FR FR\\!\\!\\! 💀💀💀 TRY AGAIN LATER GANG\\!\\!\\!';
+      return 'Eh sori gang\\, something went wrong\\. Try again later k\\!';
     }
   }
 
