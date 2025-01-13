@@ -892,7 +892,7 @@ class GroupChatBot {
       const { catalogs, shows, projects } = await this.searchArtistInfo(query);
 
       // Format response with markdown escaping
-      let response = '';
+      let response = `Yo gang\\! Here's what I found about ${this.escapeMarkdown(query)}:\\n\\n`;
       
       if (catalogs?.length) {
         response += `🎵 *Releases* \\(${catalogs.length}\\):\\n`;
@@ -952,10 +952,15 @@ class GroupChatBot {
         if (projects.length > 3) response += `_\\.\\.\\.and ${projects.length - 3} more projects_\\n`;
       }
 
-      return response || `No information found for "${this.escapeMarkdown(query)}"`;
+      if (!catalogs?.length && !shows?.length && !projects?.length) {
+        return `Yo bro\\, couldn't find anything about "${this.escapeMarkdown(query)}" in the database\\. Hit me up when they drop something new\\!`;
+      }
+
+      response += `\\nStay locked in for more updates gang\\! 🔥`;
+      return response;
     } catch (error) {
       console.error('Error in artist inquiry:', error);
-      return 'Sorry, there was an error processing your request\\.';
+      return 'My bad gang\\, something went wrong\\. Try again later\\.';
     }
   }
 
