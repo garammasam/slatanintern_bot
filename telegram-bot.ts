@@ -65,6 +65,11 @@ interface MerchKeyword {
   regex: RegExp;
 }
 
+interface SocialKeyword {
+  words: string[];
+  regex: RegExp;
+}
+
 // Create a simple HTTP server for health checks
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -136,6 +141,10 @@ class GroupChatBot {
   private merchKeywords: MerchKeyword = {
     words: ['merch', 'merchandise', 'baju', 'tshirt', 't-shirt', 'tee', 'hoodie', 'cap', 'snapback', 'bundle'],
     regex: /\b(merch|merchandise|baju|tshirt|t-shirt|tee|hoodie|cap|snapback|bundle)\b/i
+  };
+  private socialKeywords: SocialKeyword = {
+    words: ['ig', 'instagram', 'insta', 'social', 'socmed', 'media', 'follow'],
+    regex: /\b(ig|instagram|insta|social|socmed|media|follow)\b/i
   };
   
   constructor(config: BotConfig) {
@@ -506,6 +515,12 @@ class GroupChatBot {
       if (this.merchKeywords.regex.test(messageTextLower)) {
         const merchResponse = this.handleMerchInquiry();
         await ctx.reply(merchResponse);
+        return;
+      }
+      
+      if (this.socialKeywords.regex.test(messageTextLower)) {
+        const socialResponse = this.handleSocialInquiry();
+        await ctx.reply(socialResponse);
         return;
       }
     }
@@ -1225,10 +1240,21 @@ class GroupChatBot {
 
   private handleMerchInquiry(): string {
     const responses = [
-      "YO GANG! 🔥 Nak cop merch SLATAN? Head over to https://dataran.online fr fr! Support local scene! 💯",
-      "AYOOO check out our official merch at https://dataran.online gang! 🛍️ Drip too hard fr fr! 🔥",
-      "GANG GANG! All official SLATAN merch available at https://dataran.online! Cop before sold out! 🔥",
-      "YO BRO! Looking for SLATAN drip? https://dataran.online is the only official store! Get yours now! 💯"
+      "YO GANG! 🔥 Cop official SLATAN merch at @dataran.online on IG or https://dataran.online! Support local scene! 💯",
+      "AYOOO check out @dataran.online on IG or https://dataran.online for official merch gang! 🛍️ Drip too hard fr fr! 🔥",
+      "GANG GANG! Official SLATAN merch at @dataran.online (IG) or https://dataran.online! Cop before sold out! 🔥",
+      "YO BRO! Looking for SLATAN drip? @dataran.online on IG or https://dataran.online is the only official store! Get yours now! 💯"
+    ];
+    
+    return responses[Math.floor(Math.random() * responses.length)];
+  }
+
+  private handleSocialInquiry(): string {
+    const responses = [
+      "YO GANG! 🔥 Follow SLATAN on Instagram @lebuhrayaselatan for all the latest updates! 📱",
+      "AYOOO check out our official IG @lebuhrayaselatan gang! Stay updated with all the heat! 🔥",
+      "GANG GANG! Follow @lebuhrayaselatan on IG to keep up with everything SLATAN! 💯",
+      "YO BRO! Don't miss any updates, follow @lebuhrayaselatan on Instagram! 🔥"
     ];
     
     return responses[Math.floor(Math.random() * responses.length)];
