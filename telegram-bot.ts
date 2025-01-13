@@ -655,7 +655,7 @@ class GroupChatBot {
 
   private escapeMarkdown(text: string): string {
     return text
-      .replace(/([_*\[\]()~`>#+=|{}.!\\-])/g, '\\$1') // Escape MarkdownV2 special characters
+      .replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&') // Escape MarkdownV2 special characters
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
@@ -1273,10 +1273,10 @@ class GroupChatBot {
 
   private handleMerchInquiry(): string {
     const responses = [
-      "Yo gang\\! 🔥 Cop official SLATAN merch at @dataran\\.online on IG or dataran\\.online\\! Support local scene\\! 💯",
-      "Ayoo check out @dataran\\.online on IG or dataran\\.online for official merch gang\\! 🛍️ Drip too hard fr fr\\! 🔥",
-      "Gang gang\\! Official SLATAN merch at @dataran\\.online \\(IG\\) or dataran\\.online\\! Cop before sold out\\! 🔥",
-      "Yo bro\\! Looking for SLATAN drip\\? @dataran\\.online on IG or dataran\\.online is the only official store\\! Get yours now\\! 💯"
+      "Yo gang! 🔥 Cop official SLATAN merch at @dataran.online on IG or dataran.online! Support local scene! 💯",
+      "Ayoo check out @dataran.online on IG or dataran.online for official merch gang! 🛍️ Drip too hard fr fr! 🔥",
+      "Gang gang! Official SLATAN merch at @dataran.online (IG) or dataran.online! Cop before sold out! 🔥",
+      "Yo bro! Looking for SLATAN drip? @dataran.online on IG or dataran.online is the only official store! Get yours now! 💯"
     ];
     
     const response = responses[Math.floor(Math.random() * responses.length)];
@@ -1285,10 +1285,10 @@ class GroupChatBot {
 
   private handleSocialInquiry(): string {
     const responses = [
-      "YO GANG\\! 🔥 Follow SLATAN on Instagram @lebuhrayaselatan for all the latest updates\\! 📱",
-      "AYOOO check out our official IG @lebuhrayaselatan gang\\! Stay updated with all the heat\\! 🔥",
-      "GANG GANG\\! Follow @lebuhrayaselatan on IG to keep up with everything SLATAN\\! 💯",
-      "YO BRO\\! Don't miss any updates, follow @lebuhrayaselatan on Instagram\\! 🔥"
+      "YO GANG! 🔥 Follow SLATAN on Instagram @lebuhrayaselatan for all the latest updates! 📱",
+      "AYOOO check out our official IG @lebuhrayaselatan gang! Stay updated with all the heat! 🔥",
+      "GANG GANG! Follow @lebuhrayaselatan on IG to keep up with everything SLATAN! 💯",
+      "YO BRO! Don't miss any updates, follow @lebuhrayaselatan on Instagram! 🔥"
     ];
     
     return responses[Math.floor(Math.random() * responses.length)];
