@@ -31,6 +31,14 @@ interface Message {
   timestamp: number;
 }
 
+interface PollInfo {
+  userId: number;
+  pollId: string;
+  messageId: number;
+  startTime: number;
+  timer: NodeJS.Timeout;
+}
+
 class GroupChatBot {
   private bot: Bot;
   private openai: OpenAI;
@@ -41,7 +49,7 @@ class GroupChatBot {
   private readonly USER_COOLDOWN = 60000; // 1 minute cooldown per user
   private groupLastResponse: Map<string, number> = new Map();
   private readonly GROUP_COOLDOWN = 10000; // 10 seconds cooldown per group
-  private kickPolls: Map<string, { userId: number; pollId: string }> = new Map();
+  private kickPolls: Map<string, PollInfo> = new Map();
   
   constructor(config: BotConfig) {
     this.bot = new Bot(config.telegramToken);
@@ -255,81 +263,8 @@ class GroupChatBot {
 
         const username = replyToMessage.from.username || replyToMessage.from.first_name || 'user';
         
-        console.log('Creating kick poll for:', {
-          chatId: ctx.chat.id,
-          userId: userToKick,
-          username: username
-        });
-
-        // Create a kick poll
-        const poll = await ctx.api.sendPoll(
-          ctx.chat.id,
-          `Nak kick ${username} ke? 🤔`,
-          ['✅ Kick', '❌ No'].map(text => ({ text })),
-          {
-            is_anonymous: false,
-            allows_multiple_answers: false,
-            open_period: 300 // 5 minutes
-          }
-        );
-
-        console.log('Kick poll created:', {
-          pollId: poll.poll.id,
-          options: poll.poll.options
-        });
-
-        // Store poll information for later
-        this.kickPolls.set(ctx.chat.id.toString(), {
-          userId: userToKick,
-          pollId: poll.poll.id
-        });
-
-        // Set a timer to process the poll results after 5 minutes
-        setTimeout(async () => {
-          try {
-            console.log('Poll timer expired, processing results...');
-            // Get the latest poll results
-            const message = await ctx.api.stopPoll(ctx.chat.id, poll.message_id);
-            
-            const totalVotes = message.total_voter_count;
-            const kickVotes = message.options[0].voter_count; // First option is "Kick"
-
-            console.log('Processing poll results:', {
-              totalVotes,
-              kickVotes,
-              options: message.options
-            });
-
-            // If more than 50% voted to kick
-            if (totalVotes > 0 && kickVotes > totalVotes / 2) {
-              try {
-                console.log('Attempting to kick user:', userToKick);
-                
-                // First try to kick
-                await ctx.api.banChatMember(ctx.chat.id, userToKick, {
-                  until_date: Math.floor(Date.now() / 1000) + 60 // Ban for 1 minute
-                });
-                
-                // Then unban to allow them to rejoin
-                await ctx.api.unbanChatMember(ctx.chat.id, userToKick);
-                
-                await ctx.api.sendMessage(ctx.chat.id, `User dah kena kick sebab ramai vote ✅ (${kickVotes}/${totalVotes} votes)`);
-                console.log('User kicked successfully');
-              } catch (error) {
-                console.error('Error kicking user:', error);
-                await ctx.api.sendMessage(ctx.chat.id, 'Eh sori, tak dapat nak kick 😅 Check bot permissions k?');
-              }
-            } else {
-              console.log('Not enough votes to kick');
-              await ctx.api.sendMessage(ctx.chat.id, `Tak cukup votes untuk kick 🤷‍♂️ (${kickVotes}/${totalVotes} votes)`);
-            }
-
-            // Remove poll from tracking
-            this.kickPolls.delete(ctx.chat.id.toString());
-          } catch (error) {
-            console.error('Error processing poll results:', error);
-          }
-        }, 300000); // 5 minutes in milliseconds
+        // Create and handle the kick poll
+        await this.createKickPoll(ctx, userToKick, username);
 
       } catch (error) {
         console.error('Error in kick command:', error);
@@ -599,25 +534,26 @@ class GroupChatBot {
         process.exit(0);
       });
 
-      await this.bot.start({
-        onStart: (botInfo) => {
-          console.log('Bot connected successfully');
-          console.log('Bot info:', botInfo);
-          this.reconnectAttempts = 0;
-        },
-        drop_pending_updates: true, // Ignore updates from previous sessions
-        allowed_updates: ['message', 'chat_member', 'poll'] // Only listen for specific updates
-      });
-    } catch (error: any) {
-      if (error?.error_code === 409) {
-        console.log('Another bot instance is running. Waiting for it to release...');
-        // Wait for 10 seconds before trying again
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        await this.start();
-      } else {
-        console.error('Failed to start bot:', error);
+      try {
+        await this.bot.start({
+          onStart: (botInfo) => {
+            console.log('Bot connected successfully');
+            console.log('Bot info:', botInfo);
+            this.reconnectAttempts = 0;
+          },
+          drop_pending_updates: true, // Ignore updates from previous sessions
+          allowed_updates: ['message', 'chat_member', 'poll'] // Only listen for specific updates
+        });
+      } catch (error: any) {
+        if (error?.error_code === 409) {
+          console.error('Another bot instance is running. Exiting...');
+          process.exit(1);
+        }
         throw error;
       }
+    } catch (error) {
+      console.error('Failed to start bot:', error);
+      process.exit(1);
     }
   }
 
@@ -627,6 +563,78 @@ class GroupChatBot {
       await this.bot.stop();
     } catch (error) {
       console.error('Error stopping bot:', error);
+    }
+  }
+
+  private async createKickPoll(ctx: Context, userToKick: number, username: string) {
+    if (!ctx.chat) {
+      console.error('Chat context is undefined');
+      return;
+    }
+
+    const poll = await ctx.api.sendPoll(
+      ctx.chat.id,
+      `Nak kick ${username} ke? 🤔`,
+      ['✅ Kick', '❌ No'].map(text => ({ text })),
+      {
+        is_anonymous: false,
+        allows_multiple_answers: false,
+        open_period: 300 // 5 minutes
+      }
+    );
+
+    // Store poll information
+    const pollInfo: PollInfo = {
+      userId: userToKick,
+      pollId: poll.poll.id,
+      messageId: poll.message_id,
+      startTime: Date.now(),
+      timer: setTimeout(async () => {
+        await this.processPollResults(ctx, poll.message_id, userToKick);
+      }, 300000) // 5 minutes
+    };
+
+    this.kickPolls.set(ctx.chat.id.toString(), pollInfo);
+    
+    return poll;
+  }
+
+  private async processPollResults(ctx: Context, messageId: number, userToKick: number) {
+    if (!ctx.chat) {
+      console.error('Chat context is undefined');
+      return;
+    }
+
+    try {
+      console.log('Processing poll results for message:', messageId);
+      const message = await ctx.api.stopPoll(ctx.chat.id, messageId);
+      
+      const totalVotes = message.total_voter_count;
+      const kickVotes = message.options[0].voter_count;
+
+      if (totalVotes > 0 && kickVotes > totalVotes / 2) {
+        try {
+          await ctx.api.banChatMember(ctx.chat.id, userToKick, {
+            until_date: Math.floor(Date.now() / 1000) + 60
+          });
+          await ctx.api.unbanChatMember(ctx.chat.id, userToKick);
+          await ctx.api.sendMessage(ctx.chat.id, `User dah kena kick sebab ramai vote ✅ (${kickVotes}/${totalVotes} votes)`);
+        } catch (error) {
+          console.error('Error executing kick:', error);
+          await ctx.api.sendMessage(ctx.chat.id, 'Eh sori, tak dapat nak kick 😅 Check bot permissions k?');
+        }
+      } else {
+        await ctx.api.sendMessage(ctx.chat.id, `Tak cukup votes untuk kick 🤷‍♂️ (${kickVotes}/${totalVotes} votes)`);
+      }
+    } catch (error) {
+      console.error('Error processing poll results:', error);
+    } finally {
+      // Clean up poll data
+      const pollInfo = this.kickPolls.get(ctx.chat.id.toString()) as PollInfo;
+      if (pollInfo?.timer) {
+        clearTimeout(pollInfo.timer);
+      }
+      this.kickPolls.delete(ctx.chat.id.toString());
     }
   }
 }
