@@ -575,33 +575,34 @@ class GroupChatBot {
       const lastMessage = history[history.length - 1];
       const context = [];
 
-      // Enhanced pattern matching for artist inquiries
+      // Enhanced pattern matching for artist inquiries - extract just the artist name
       const artistMatch = lastMessage?.content.toLowerCase().match(
-        /(?:about|who|what|tell|info|songs?|tracks?|catalog|music|lagu|dengar|check|tengok|cari)\s+(?:by|from|about|untuk|oleh|daripada)?\s*([a-zA-Z0-9\s_]+)/i
+        /(?:about|who|what|tell|info|songs?|tracks?|catalog|music|lagu|dengar|check|tengok|cari)\s+(?:by|from|about|untuk|oleh|daripada)?\s*([a-zA-Z0-9\s_]+)(?:\s+ke)?$/i
       );
 
       if (artistMatch) {
-        console.log('Artist inquiry detected:', artistMatch[1]);
-        const artistQuery = artistMatch[1].trim();
-        const artistInfo = await this.searchArtistInfo(artistQuery);
+        // Extract just the artist name and clean it up
+        const artistName = artistMatch[1].trim().split(/\s+/).pop() || '';
+        console.log('Artist inquiry detected, searching for:', artistName);
+        const artistInfo = await this.searchArtistInfo(artistName);
         
         if (artistInfo.catalogs && artistInfo.catalogs.length > 0) {
           console.log('Found catalog entries:', artistInfo.catalogs.length);
           context.push({
             role: "system",
-            content: `Catalog tracks by ${this.escapeMarkdown(artistQuery)}: ${artistInfo.catalogs.map(track => 
+            content: `Catalog tracks by ${this.escapeMarkdown(artistName)}: ${artistInfo.catalogs.map(track => 
               `*${this.escapeMarkdown(track.title)}* (${this.escapeMarkdown(track.language)}, ${this.escapeMarkdown(track.duration)}${track.link ? `, ${track.link}` : ''})`
             ).join('; ')}`
           });
         } else {
-          console.log('No catalog entries found for:', artistQuery);
+          console.log('No catalog entries found for:', artistName);
         }
 
         // Add shows information if available
         if (artistInfo.shows && artistInfo.shows.length > 0) {
           context.push({
             role: "system",
-            content: `Shows featuring ${this.escapeMarkdown(artistQuery)}: ${artistInfo.shows.map(show => 
+            content: `Shows featuring ${this.escapeMarkdown(artistName)}: ${artistInfo.shows.map(show => 
               `*${this.escapeMarkdown(show.title)}* at ${this.escapeMarkdown(show.venue)} (${this.escapeMarkdown(show.date)})`
             ).join('; ')}`
           });
@@ -611,7 +612,7 @@ class GroupChatBot {
         if (artistInfo.projects && artistInfo.projects.length > 0) {
           context.push({
             role: "system",
-            content: `Projects involving ${this.escapeMarkdown(artistQuery)}: ${artistInfo.projects.map(project => 
+            content: `Projects involving ${this.escapeMarkdown(artistName)}: ${artistInfo.projects.map(project => 
               `*${this.escapeMarkdown(project.title)}* (${this.escapeMarkdown(project.status.toLowerCase())})`
             ).join('; ')}`
           });
