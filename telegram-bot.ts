@@ -3,7 +3,6 @@ import { OpenAI } from 'openai';
 import { config } from 'dotenv';
 import * as http from 'http';
 import { createClient } from '@supabase/supabase-js';
-import * as fs from 'fs/promises';
 
 // Load environment variables
 config();
@@ -70,35 +69,6 @@ interface Project {
   updated_at: string;
 }
 
-interface Artist {
-  id: number;
-  name: string;
-  alias?: string;
-  bio?: string;
-}
-
-interface Track {
-  id: number;
-  title: string;
-  artist_id: number;
-  release_date: string;
-  type: 'single' | 'album' | 'ep' | 'feature';
-  platform_links?: {
-    spotify?: string;
-    youtube?: string;
-    soundcloud?: string;
-  };
-}
-
-interface Event {
-  id: number;
-  title: string;
-  date: string;
-  description?: string;
-  location?: string;
-  status: 'upcoming' | 'past' | 'cancelled';
-}
-
 interface CatalogTrack {
   id: string;
   title: string;
@@ -161,13 +131,8 @@ class GroupChatBot {
     this.openai = new OpenAI({ apiKey: config.openaiKey });
     this.config = config;
     
-    // Initialize message history
     this.config.messageHistory = new Map();
-    
-    // Set up error handling
     this.setupErrorHandling();
-    
-    // Set up message handlers
     this.setupHandlers();
   }
   
@@ -569,57 +534,12 @@ class GroupChatBot {
     return this.config.messageHistory.get(groupId) || [];
   }
   
-  private async getArtists(): Promise<Artist[]> {
+  private async getUpcomingShows(): Promise<Show[]> {
     const { data, error } = await supabase
-      .from('artists')
-      .select('*');
-    
-    if (error) {
-      console.error('Error fetching artists:', error);
-      return [];
-    }
-    return data;
-  }
-
-  private async getLatestTracks(limit: number = 5): Promise<Track[]> {
-    const { data, error } = await supabase
-      .from('tracks')
-      .select('*')
-      .order('release_date', { ascending: false })
-      .limit(limit);
-    
-    if (error) {
-      console.error('Error fetching tracks:', error);
-      return [];
-    }
-    return data;
-  }
-
-  private async getUpcomingEvents(): Promise<Event[]> {
-    const { data, error } = await supabase
-      .from('events')
+      .from('shows')
       .select('*')
       .eq('status', 'upcoming')
       .order('date', { ascending: true });
-    
-    if (error) {
-      console.error('Error fetching events:', error);
-      return [];
-    }
-    return data;
-  }
-
-  private async getShows(status?: 'upcoming' | 'completed'): Promise<Show[]> {
-    let query = supabase
-      .from('shows')
-      .select('*')
-      .order('date', { ascending: true });
-    
-    if (status) {
-      query = query.eq('status', status);
-    }
-    
-    const { data, error } = await query;
     
     if (error) {
       console.error('Error fetching shows:', error);
@@ -649,15 +569,32 @@ class GroupChatBot {
 
   private async enrichResponseContext(groupId: string): Promise<any[]> {
     try {
+      const history = this.getRecentHistory(groupId);
+      const lastMessage = history[history.length - 1];
+      const context = [];
+
+      // Check if the message is asking about an artist
+      const artistMatch = lastMessage?.content.match(/(?:about|who is|tell me about|info about|songs by|tracks by|catalog of)\s+([^\s?.,!]+)/i);
+      if (artistMatch) {
+        const artistQuery = artistMatch[1];
+        const artistInfo = await this.searchArtistInfo(artistQuery);
+        
+        if (artistInfo.catalogs.length > 0) {
+          context.push({
+            role: "system",
+            content: `Catalog tracks by ${artistQuery}: ${artistInfo.catalogs.map(track => 
+              `${track.title} (${track.language}, ${track.duration}${track.link ? `, ${track.link}` : ''})`
+            ).join('; ')}`
+          });
+        }
+      }
+
       // Fetch latest data
       const [upcomingShows, currentProjects] = await Promise.all([
-        this.getShows('upcoming'),
+        this.getUpcomingShows(),
         this.getProjects('IN_PROGRESS')
       ]);
 
-      // Create context messages
-      const context = [];
-      
       if (upcomingShows.length > 0) {
         context.push({
           role: "system",
@@ -675,7 +612,6 @@ class GroupChatBot {
           ).join('; ')}`
         });
 
-        // Add detailed track information for each project
         currentProjects.forEach(project => {
           if (project.tracks?.length > 0) {
             context.push({
@@ -765,22 +701,27 @@ class GroupChatBot {
 
   private async loadCatalogData(): Promise<CatalogTrack[]> {
     try {
-      const csvData = await fs.readFile('catalogs_rows.csv', 'utf-8');
-      const rows = csvData.split('\n').slice(1); // Skip header
-      return rows.map(row => {
-        const [id, title, artistStr, language, duration, release_date, isrc, , , link] = row.split(',');
-        return {
-          id,
-          title,
-          artist: JSON.parse(artistStr || '[]'),
-          language,
-          duration,
-          release_date,
-          isrc,
-          link,
-          type: 'Original'
-        };
-      }).filter(track => track.id); // Filter out empty rows
+      const { data, error } = await supabase
+        .from('catalogs')
+        .select('*')
+        .order('release_date', { ascending: false });
+
+      if (error) {
+        console.error('Error loading catalog data:', error);
+        return [];
+      }
+
+      return data.map(row => ({
+        id: row.id,
+        title: row.title,
+        artist: row.artist,
+        language: row.language,
+        duration: row.duration,
+        release_date: row.release_date,
+        isrc: row.isrc,
+        link: row.link,
+        type: row.type || 'Original'
+      }));
     } catch (error) {
       console.error('Error loading catalog data:', error);
       return [];
@@ -792,31 +733,32 @@ class GroupChatBot {
     projects: Project[],
     catalogs: CatalogTrack[]
   }> {
-    const [shows, projects, catalogData] = await Promise.all([
-      this.getShows(),
+    const normalizedQuery = artistQuery.toLowerCase().trim();
+
+    // Use Supabase's built-in text search for better performance
+    const [shows, projects, { data: catalogs }] = await Promise.all([
+      this.getUpcomingShows(),
       this.getProjects(),
-      this.loadCatalogData()
+      supabase
+        .from('catalogs')
+        .select('*')
+        .textSearch('artist', normalizedQuery)
+        .order('release_date', { ascending: false })
     ]);
 
-    const normalizedQuery = artistQuery.toLowerCase().trim();
-    
-    const filteredShows = shows.filter(show => 
-      show.artists.some(artist => artist.toLowerCase().includes(normalizedQuery))
+    const filteredShows = shows.filter((show: Show) => 
+      show.artists.some((artist: string) => artist.toLowerCase().includes(normalizedQuery))
     );
 
-    const filteredProjects = projects.filter(project =>
+    const filteredProjects = projects.filter((project: Project) =>
       project.artist.toLowerCase().includes(normalizedQuery) ||
-      project.collaborators.some(collab => collab.toLowerCase().includes(normalizedQuery))
-    );
-
-    const filteredCatalogs = catalogData.filter(track =>
-      track.artist.some(artist => artist.toLowerCase().includes(normalizedQuery))
+      project.collaborators.some((collab: string) => collab.toLowerCase().includes(normalizedQuery))
     );
 
     return {
       shows: filteredShows,
       projects: filteredProjects,
-      catalogs: filteredCatalogs
+      catalogs: catalogs || []
     };
   }
 
