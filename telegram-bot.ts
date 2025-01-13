@@ -707,6 +707,40 @@ class GroupChatBot {
       const lastMessage = history[history.length - 1];
       const context = [];
 
+      // Add conversation awareness context
+      if (history.length >= 2) {
+        const previousBotMessage = history[history.length - 2];
+        if (previousBotMessage.role === 'assistant') {
+          context.push({
+            role: "system",
+            content: `Your last message was: "${previousBotMessage.content}". The user is now responding to that message.`
+          });
+        }
+      }
+
+      // Add common Malaysian slang understanding
+      const slangContext = {
+        "lipak": "calling someone out for lying/capping",
+        "cap": "lying/not telling truth",
+        "mengada": "being fake/pretentious",
+        "tipu": "lying",
+        "bohong": "lying",
+        "sembang": "just talking/chatting nonsense",
+        "membawang": "gossiping/talking nonsense"
+      };
+
+      // Check if the message contains any slang calling out the bot
+      const messageLower = lastMessage?.content.toLowerCase() || '';
+      for (const [slang, meaning] of Object.entries(slangContext)) {
+        if (messageLower.includes(slang)) {
+          context.push({
+            role: "system",
+            content: `The user just used the word "${slang}" which means "${meaning}". They might be calling you out or disagreeing with your previous statement. Respond appropriately and honestly.`
+          });
+          break;
+        }
+      }
+
       // Enhanced pattern matching for artist inquiries - extract just the artist name
       const artistMatch = lastMessage?.content.toLowerCase().match(
         /(?:about|who|what|tell|info|songs?|tracks?|catalog|music|lagu|dengar|check|tengok|cari)\s+(?:by|from|about|untuk|oleh|daripada)?\s*([a-zA-Z0-9\s_]+)(?:\s+ke)?$/i
@@ -875,7 +909,7 @@ class GroupChatBot {
             content: msg.content
           }))
         ],
-        temperature: 0.8, // Slightly increased for more personality
+        temperature: 0.7,
         max_tokens: 500,
         presence_penalty: 0.6,
         frequency_penalty: 0.6
