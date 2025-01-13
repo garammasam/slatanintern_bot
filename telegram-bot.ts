@@ -438,14 +438,6 @@ class GroupChatBot {
     const groupId = ctx.chat?.id.toString();
     const messageText = ctx.message?.text;
     
-    // Log chat information
-    console.log('Chat Info:', {
-      chatId: ctx.chat?.id,
-      chatType: ctx.chat?.type,
-      messageFrom: ctx.message?.from?.username,
-      messageText: ctx.message?.text
-    });
-    
     if (!groupId || !messageText) return;
     
     // Update conversation history
@@ -460,8 +452,8 @@ class GroupChatBot {
       if (response) {
         // Add some human-like delay
         await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-        await ctx.reply(response, {
-          parse_mode: 'MarkdownV2' // Use Markdown instead of HTML
+        await ctx.reply(this.escapeMarkdown(response), {
+          parse_mode: 'MarkdownV2'
         });
         
         // Update history with bot's response
@@ -500,9 +492,9 @@ class GroupChatBot {
         // Add some human-like delay
         await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
         console.log('Sending response:', response);
-        await ctx.reply(response, {
+        await ctx.reply(this.escapeMarkdown(response), {
           reply_to_message_id: ctx.message.message_id,
-          parse_mode: 'MarkdownV2' // Use Markdown instead of HTML
+          parse_mode: 'MarkdownV2'
         });
         
         // Update history with bot's response
@@ -572,7 +564,9 @@ class GroupChatBot {
 
   private escapeMarkdown(text: string): string {
     // Characters that need to be escaped in MarkdownV2: _ * [ ] ( ) ~ ` > # + - = | { } . !
-    return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+    const escaped = text.replace(/([_*[\]()~`>#+=|{}.!-])/g, '\\$1');
+    // Also escape any backslashes that aren't already escaping special characters
+    return escaped.replace(/\\([^_*[\]()~`>#+=|{}.!-])/g, '\\\\$1');
   }
 
   private async enrichResponseContext(groupId: string): Promise<any[]> {
