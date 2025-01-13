@@ -72,14 +72,30 @@ interface SocialKeyword {
 
 // Create a simple HTTP server for health checks
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ status: 'healthy', timestamp: new Date().toISOString() }));
+  if (req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      status: 'healthy', 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      botStatus: 'running'
+    }));
+  } else {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok' }));
+  }
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Health check server listening on port ${PORT}`);
 });
+
+// Add keep-alive ping
+setInterval(() => {
+  console.log('Keep-alive ping:', new Date().toISOString());
+}, 60000); // Ping every minute
 
 interface BotConfig {
   telegramToken: string;
@@ -160,21 +176,45 @@ class GroupChatBot {
   }
   
   private setupErrorHandling() {
-    this.bot.catch((err) => {
+    this.bot.catch(async (err) => {
       console.error('Bot error:', err);
       
       if (this.reconnectAttempts < this.MAX_RECONNECT_ATTEMPTS) {
         console.log(`Attempting to reconnect (${this.reconnectAttempts + 1}/${this.MAX_RECONNECT_ATTEMPTS})...`);
         this.reconnectAttempts++;
         
-        // Wait for 5 seconds before reconnecting
-        setTimeout(() => {
-          this.start();
-        }, 5000);
+        try {
+          // Stop the current instance
+          await this.stop();
+          
+          // Wait with exponential backoff
+          const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+          console.log(`Waiting ${delay}ms before reconnecting...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          
+          // Try to restart
+          await this.start();
+          console.log('Reconnection successful');
+          this.reconnectAttempts = 0;
+        } catch (error) {
+          console.error('Error during reconnection:', error);
+          // If we still have attempts left, the next error will trigger another try
+        }
       } else {
-        console.error('Max reconnection attempts reached. Please check your connection and restart the bot manually.');
-        process.exit(1);
+        console.error('Max reconnection attempts reached. Exiting process for container restart...');
+        process.exit(1); // Let the container restart the process
       }
+    });
+
+    // Add process error handlers
+    process.on('uncaughtException', (error) => {
+      console.error('Uncaught Exception:', error);
+      process.exit(1); // Exit and let container restart
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+      process.exit(1); // Exit and let container restart
     });
   }
   
@@ -1187,7 +1227,7 @@ class GroupChatBot {
 
   public async start() {
     try {
-      console.log('Starting bot...');
+      console.log('Starting bot...', new Date().toISOString());
       
       // Add error handler for process termination
       process.on('SIGTERM', async () => {
@@ -1205,13 +1245,28 @@ class GroupChatBot {
       try {
         await this.bot.start({
           onStart: (botInfo) => {
-            console.log('Bot connected successfully');
-            console.log('Bot info:', botInfo);
+            console.log('Bot connected successfully', {
+              timestamp: new Date().toISOString(),
+              botInfo: botInfo
+            });
             this.reconnectAttempts = 0;
           },
-          drop_pending_updates: true, // Ignore updates from previous sessions
-          allowed_updates: ['message', 'chat_member', 'poll'] // Only listen for specific updates
+          drop_pending_updates: true,
+          allowed_updates: ['message', 'chat_member', 'poll']
         });
+
+        // Add periodic health check
+        setInterval(async () => {
+          try {
+            await this.bot.api.getMe();
+            console.log('Bot health check passed:', new Date().toISOString());
+          } catch (error) {
+            console.error('Bot health check failed:', error);
+            this.reconnectAttempts = 0; // Reset attempts for fresh start
+            throw error; // This will trigger the bot.catch handler
+          }
+        }, 5 * 60 * 1000); // Check every 5 minutes
+
       } catch (error: any) {
         if (error?.error_code === 409) {
           console.error('Another bot instance is running. Exiting...');
@@ -1227,10 +1282,12 @@ class GroupChatBot {
 
   public async stop() {
     try {
-      console.log('Stopping bot...');
+      console.log('Stopping bot...', new Date().toISOString());
       await this.bot.stop();
+      console.log('Bot stopped successfully');
     } catch (error) {
       console.error('Error stopping bot:', error);
+      throw error; // Propagate error for proper handling
     }
   }
 
