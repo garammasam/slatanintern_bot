@@ -685,7 +685,7 @@ class GroupChatBot {
             context.push({
               role: "system",
               content: `Tracks in ${this.escapeMarkdown(project.title)}:\n${project.tracks.map((t, i) => 
-                `${i + 1}\\. *${this.escapeMarkdown(t.title)}* (${this.escapeMarkdown(t.status.toLowerCase())}${t.features.length > 0 ? `, featuring ${t.features.map(f => this.escapeMarkdown(f)).join(', ')}` : ''})`
+                `${i + 1}. *${this.escapeMarkdown(t.title)}* (${this.escapeMarkdown(t.status.toLowerCase())}${t.features.length > 0 ? `, featuring ${t.features.map(f => this.escapeMarkdown(f)).join(', ')}` : ''})`
               ).join('\n')}`
             });
           }
@@ -868,39 +868,35 @@ class GroupChatBot {
 
   private async handleProjectResponse(project: Project): Promise<string> {
     try {
-      let response = `YOOO GANG\\! 🔥 BROO check out this INSANE project from *${this.escapeMarkdown(project.artist)}* called *${this.escapeMarkdown(project.title)}*\\! 🤪 `;
+      let response = `YOOO GANG! 🔥 BROO check out this INSANE project from ${project.artist} called ${project.title}! 🤪 `;
       
       if (project.status === 'IN_PROGRESS') {
-        response += `They still COOKING THIS ONE UP fr fr and dropping on ${this.escapeMarkdown(project.deadline)} LESGOOO\\! 💀\\n\\n`;
+        response += `They still COOKING THIS ONE UP fr fr and dropping on ${project.deadline} LESGOOO! 💀\n\n`;
       } else {
-        response += `IT'S OUT NOW AND IT'S ABSOLUTE FIRE SHEEESH\\! 🔥\\n\\n`;
+        response += `IT'S OUT NOW AND IT'S ABSOLUTE FIRE SHEEESH! 🔥\n\n`;
       }
 
-      response += `CHECK OUT these CRAZY tracks from *${this.escapeMarkdown(project.title)}* fr fr\\:\\n\\n`;
+      response += `CHECK OUT these CRAZY tracks from ${project.title} fr fr:\n\n`;
 
       project.tracks.forEach((track, index) => {
         const trackNum = index + 1;
-        const title = this.escapeMarkdown(track.title);
-        const status = this.escapeMarkdown(track.status.toLowerCase());
-        const features = track.features
-          .map(f => this.escapeMarkdown(f))
-          .join('\\, ');
+        const features = track.features.join(', ');
 
-        response += `${trackNum}\\. *${title}* \\- \\(${status}\\) with the GOATS\\: ${features} SHEEESH\\! 🔥\\n`;
+        response += `${trackNum}. ${track.title} - (${track.status.toLowerCase()}) with the GOATS: ${features} SHEEESH! 🔥\n`;
       });
 
       const closings = [
-        "\\n\\nNAH FR THIS PROJECT GONNA BE DIFFERENT\\! 🔥 Stay locked in gang NO CAP\\!",
-        "\\n\\nIM TELLING U RN this one's gonna be CRAZY\\! 💫 SUPPORT LOCAL SCENE FR FR\\!",
-        "\\n\\nTHE LINEUP IS ACTUALLY INSANE BRO\\! 🎵 More heat otw SHEEESH\\!",
-        "\\n\\nCANT EVEN HANDLE HOW FIRE THIS IS\\! 🔥 TGGU JE GANG\\!"
+        "\n\nNAH FR THIS PROJECT GONNA BE DIFFERENT! 🔥 Stay locked in gang NO CAP!",
+        "\n\nIM TELLING U RN this one's gonna be CRAZY! 💫 SUPPORT LOCAL SCENE FR FR!",
+        "\n\nTHE LINEUP IS ACTUALLY INSANE BRO! 🎵 More heat otw SHEEESH!",
+        "\n\nCANT EVEN HANDLE HOW FIRE THIS IS! 🔥 TGGU JE GANG!"
       ];
       response += closings[Math.floor(Math.random() * closings.length)];
 
       return response;
     } catch (error) {
       console.error('Error formatting project response:', error);
-      return 'YO GANG my brain stopped working fr fr\\! 💀 Try again later bestieee\\!';
+      return 'YO GANG my brain stopped working fr fr! 💀 Try again later bestieee!';
     }
   }
 
@@ -912,38 +908,30 @@ class GroupChatBot {
         return this.handleProjectResponse(projects[0]);
       }
 
-      let response = `YOOO GANG\\! 🔥 Let me put u on about *${this.escapeMarkdown(query)}* FR FR\\! 🤪\\n\\n`;
+      let response = `YOOO GANG! 🔥 Let me put u on about ${query} FR FR! 🤪\n\n`;
       
       if (catalogs?.length) {
-        response += `🎵 *RELEASES* SHEEESH \\(${catalogs.length} TRACKS\\)\\! 💀\\n`;
+        response += `🎵 RELEASES SHEEESH (${catalogs.length} TRACKS)! 💀\n`;
         catalogs.slice(0, 5).forEach(track => {
-          const title = this.escapeMarkdown(track.title);
-          const date = this.escapeMarkdown(track.release_date || '');
-          const duration = this.escapeMarkdown(track.duration || '');
-          response += `\\- *${title}* DROPPED ON ${date} and its ${duration} of PURE HEAT\\! 🔥\\n`;
+          response += `- ${track.title} DROPPED ON ${track.release_date || ''} and its ${track.duration || ''} of PURE HEAT! 🔥\n`;
         });
-        if (catalogs.length > 5) response += `_NAH FR we got ${catalogs.length - 5} MORE TRACKS but my brain cant handle it rn fr fr_\\n`;
-        response += '\\n';
+        if (catalogs.length > 5) response += `NAH FR we got ${catalogs.length - 5} MORE TRACKS but my brain cant handle it rn fr fr\n`;
+        response += '\n';
       }
 
       if (shows?.length) {
-        response += `🎪 *SHOWS* LESGOOO \\(${shows.length}\\)\\! 🤪\\n`;
+        response += `🎪 SHOWS LESGOOO (${shows.length})! 🤪\n`;
         shows.slice(0, 3).forEach(show => {
-          const title = this.escapeMarkdown(show.title);
-          const venue = this.escapeMarkdown(show.venue);
-          const date = this.escapeMarkdown(show.date);
-          response += `\\- *${title}* at ${venue} on ${date} ITS GONNA BE CRAZY\\! 💫\\n`;
+          response += `- ${show.title} at ${show.venue} on ${show.date} ITS GONNA BE CRAZY! 💫\n`;
         });
-        if (shows.length > 3) response += `_BROO we got ${shows.length - 3} MORE SHOWS but im too hyped rn fr fr_\\n`;
-        response += '\\n';
+        if (shows.length > 3) response += `BROO we got ${shows.length - 3} MORE SHOWS but im too hyped rn fr fr\n`;
+        response += '\n';
       }
 
       if (projects?.length) {
-        response += `🎹 *PROJECTS* FR FR \\(${projects.length} BANGERS OTW\\)\\! 🔥\\n`;
+        response += `🎹 PROJECTS FR FR (${projects.length} BANGERS OTW)! 🔥\n`;
         projects.slice(0, 3).forEach(project => {
           const status = project.status === 'IN_PROGRESS' ? '🔄' : '✅';
-          const title = this.escapeMarkdown(project.title);
-          const genre = this.escapeMarkdown(project.genre);
           
           const featuredTracks = project.tracks
             .filter((track: ProjectTrack) => 
@@ -955,44 +943,41 @@ class GroupChatBot {
               features: track.features
             }));
           
-          response += `\\- ${status} *${title}* \\(${genre}\\) THIS ONE GONNA BE INSANE\\! 🤯\\n`;
+          response += `- ${status} ${project.title} (${project.genre}) THIS ONE GONNA BE INSANE! 🤯\n`;
           if (featuredTracks.length) {
             featuredTracks.forEach((track: TrackInfo) => {
-              const trackTitle = this.escapeMarkdown(track.title);
-              const trackStatus = this.escapeMarkdown(track.status.toLowerCase());
               const features = track.features
                 .filter((f: string) => f.toLowerCase() !== query.toLowerCase())
-                .map((f: string) => this.escapeMarkdown(f))
-                .join('\\, ');
+                .join(', ');
               
-              const streetStatus = trackStatus === 'mixing' ? 'GETTING THAT CRAZY MIX RN' : 
-                                 trackStatus === 'recording' ? 'IN THE BOOTH NO CAP' :
-                                 trackStatus === 'mastering' ? 'GETTING THAT MASTER TOUCH FR' : 
+              const streetStatus = track.status.toLowerCase() === 'mixing' ? 'GETTING THAT CRAZY MIX RN' : 
+                                 track.status.toLowerCase() === 'recording' ? 'IN THE BOOTH NO CAP' :
+                                 track.status.toLowerCase() === 'mastering' ? 'GETTING THAT MASTER TOUCH FR' : 
                                  'WRITING SOME HEAT';
               
-              response += `  • *${trackTitle}* \\(${streetStatus}\\) with the GOATS\\: ${features} SHEEESH\\!\\n`;
+              response += `  • ${track.title} (${streetStatus}) with the GOATS: ${features} SHEEESH!\n`;
             });
           }
         });
-        if (projects.length > 3) response += `_NAH FR we got ${projects.length - 3} MORE PROJECTS but im too gassed rn fr fr_\\n`;
+        if (projects.length > 3) response += `NAH FR we got ${projects.length - 3} MORE PROJECTS but im too gassed rn fr fr\n`;
       }
 
       if (!catalogs?.length && !shows?.length && !projects?.length) {
-        return `YO GANG I looked EVERYWHERE but cant find nothing bout *${this.escapeMarkdown(query)}* rn fr fr\\! 😭 BUT WHEN THEY DROP SOMETHING IMMA BE THE FIRST TO TELL U NO CAP\\! 💯`;
+        return `YO GANG I looked EVERYWHERE but cant find nothing bout ${query} rn fr fr! 😭 BUT WHEN THEY DROP SOMETHING IMMA BE THE FIRST TO TELL U NO CAP! 💯`;
       }
 
       const closings = [
-        "\\n\\nIM ACTUALLY SHAKING RN FR FR\\! 🔥 STAY TUNED FOR MORE GANG\\!",
-        "\\n\\nNAH THIS TOO MUCH HEAT FR\\! 🤪 MORE BANGERS OTW NO CAP\\!",
-        "\\n\\nCANT EVEN HANDLE ALL THIS HEAT RN\\! 💀 LESGOOO\\!",
-        "\\n\\nSUPPORT LOCAL SCENE OR UR NOT VALID FR FR\\! 🔥 NO CAP NO CAP\\!"
+        "\n\nIM ACTUALLY SHAKING RN FR FR! 🔥 STAY TUNED FOR MORE GANG!",
+        "\n\nNAH THIS TOO MUCH HEAT FR! 🤪 MORE BANGERS OTW NO CAP!",
+        "\n\nCANT EVEN HANDLE ALL THIS HEAT RN! 💀 LESGOOO!",
+        "\n\nSUPPORT LOCAL SCENE OR UR NOT VALID FR FR! 🔥 NO CAP NO CAP!"
       ];
       response += closings[Math.floor(Math.random() * closings.length)];
       
       return response;
     } catch (error) {
       console.error('Error in artist inquiry:', error);
-      return 'YO GANG my brain stopped working fr fr\\! 💀 Try again later bestieee\\!';
+      return 'YO GANG my brain stopped working fr fr! 💀 Try again later bestieee!';
     }
   }
 
@@ -1028,17 +1013,15 @@ class GroupChatBot {
 
   private formatMorningGreeting(quote: Quote): string {
     const greetings = [
-      "SELAMAT PAGI GANG\\! 🌅",
-      "PAGI PAGI DAH NAK BUAT KERJA\\! ⭐️",
-      "YO GANG DAAAAH BANGUN\\? 🌞",
-      "RISE AND SHINE GANG\\! 🌄"
+      "SELAMAT PAGI GANG! 🌅",
+      "PAGI PAGI DAH NAK BUAT KERJA! ⭐️",
+      "YO GANG DAAAAH BANGUN? 🌞",
+      "RISE AND SHINE GANG! 🌄"
     ];
 
     const greeting = greetings[Math.floor(Math.random() * greetings.length)];
-    const escapedQuote = this.escapeMarkdown(quote.text);
-    const escapedAuthor = this.escapeMarkdown(quote.author);
 
-    return `${greeting}\\n\\n*Quote of the day*\\:\\n\\n"${escapedQuote}"\\n\\- ${escapedAuthor}\\n\\nLet's get this bread gang\\! 💪 Semoga hari ni productive gila\\! 🔥`;
+    return `${greeting}\n\nQuote of the day:\n\n"${quote.text}"\n- ${quote.author}\n\nLet's get this bread gang! 💪 Semoga hari ni productive gila! 🔥`;
   }
 
   public async start() {
