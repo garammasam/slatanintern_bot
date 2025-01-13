@@ -93,7 +93,8 @@ const server = http.createServer((req, res) => {
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       memory: process.memoryUsage(),
-      botStatus: 'running'
+      botStatus: 'running',
+      lastPing: lastPingTime
     }));
   } else {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -102,14 +103,44 @@ const server = http.createServer((req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
+// Track last ping time
+let lastPingTime = new Date();
+
+// Self ping to keep the service alive
+const PING_INTERVAL = 14 * 60 * 1000; // 14 minutes (just under Render's 15-minute limit)
+const SELF_URL = process.env.SELF_URL; // Add this to your environment variables
+
+async function keepAlive() {
+  if (SELF_URL) {
+    try {
+      const response = await fetch(`${SELF_URL}/health`);
+      if (response.ok) {
+        lastPingTime = new Date();
+        console.log('Self-ping successful:', lastPingTime.toISOString());
+      } else {
+        console.error('Self-ping failed with status:', response.status);
+      }
+    } catch (error) {
+      console.error('Self-ping failed:', error);
+    }
+  }
+}
+
+// Start the keep-alive mechanism
+if (SELF_URL) {
+  setInterval(keepAlive, PING_INTERVAL);
+  console.log('Keep-alive mechanism started with interval:', PING_INTERVAL, 'ms');
+}
+
 server.listen(PORT, () => {
   console.log(`Health check server listening on port ${PORT}`);
+  if (SELF_URL) {
+    console.log('Self-ping URL configured:', SELF_URL);
+  } else {
+    console.warn('SELF_URL not configured - keep-alive mechanism disabled');
+  }
 });
-
-// Add keep-alive ping
-setInterval(() => {
-  console.log('Keep-alive ping:', new Date().toISOString());
-}, 60000); // Ping every minute
 
 interface BotConfig {
   telegramToken: string;
@@ -168,6 +199,7 @@ class GroupChatBot {
   private groupLastResponse: Map<string, number> = new Map();
   private readonly GROUP_COOLDOWN = 10000; // 10 seconds cooldown per group
   private kickPolls: Map<string, PollInfo> = new Map();
+  private lastActivityTime: Date = new Date();
   private merchKeywords: MerchKeyword = {
     words: ['merch', 'merchandise', 'baju', 'tshirt', 't-shirt', 'tee', 'hoodie', 'cap', 'snapback', 'bundle', 'store', 'shop', 'kedai', 'beli', 'buy', 'cop'],
     regex: /\b(merch|merchandise|baju|tshirt|t-shirt|tee|hoodie|cap|snapback|bundle|store|shop|kedai|beli|buy|cop)\b/i
@@ -272,32 +304,51 @@ class GroupChatBot {
     this.bot.catch(async (err) => {
       console.error('Bot error:', err);
       
+      // Update last activity time on error handling
+      this.lastActivityTime = new Date();
+      
       if (this.reconnectAttempts < this.MAX_RECONNECT_ATTEMPTS) {
         console.log(`Attempting to reconnect (${this.reconnectAttempts + 1}/${this.MAX_RECONNECT_ATTEMPTS})...`);
         this.reconnectAttempts++;
         
         try {
-          // Stop the current instance
           await this.stop();
           
-          // Wait with exponential backoff
           const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
           console.log(`Waiting ${delay}ms before reconnecting...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           
-          // Try to restart
           await this.start();
           console.log('Reconnection successful');
           this.reconnectAttempts = 0;
         } catch (error) {
           console.error('Error during reconnection:', error);
-          // If we still have attempts left, the next error will trigger another try
         }
       } else {
-        console.error('Max reconnection attempts reached. Exiting process for container restart...');
+        console.error('Max reconnection attempts reached. Restarting process...');
         process.exit(1); // Let the container restart the process
       }
     });
+
+    // Add additional health check
+    setInterval(async () => {
+      try {
+        const inactiveTime = Date.now() - this.lastActivityTime.getTime();
+        console.log('Time since last activity:', Math.floor(inactiveTime / 1000), 'seconds');
+        
+        // If inactive for more than 10 minutes, perform health check
+        if (inactiveTime > 10 * 60 * 1000) {
+          console.log('Performing health check due to inactivity...');
+          await this.bot.api.getMe();
+          this.lastActivityTime = new Date();
+          console.log('Health check passed, bot is active');
+        }
+      } catch (error) {
+        console.error('Health check failed:', error);
+        this.reconnectAttempts = 0;
+        throw error; // This will trigger the bot.catch handler
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
 
     // Add process error handlers
     process.on('uncaughtException', (error) => {
@@ -591,6 +642,7 @@ class GroupChatBot {
   }
   
   private async handleGroupMessage(ctx: Context) {
+    this.lastActivityTime = new Date(); // Update activity timestamp
     const groupId = ctx.chat?.id.toString();
     const messageText = ctx.message?.text;
     
@@ -625,6 +677,7 @@ class GroupChatBot {
   }
   
   private async handleDirectMention(ctx: Context) {
+    this.lastActivityTime = new Date(); // Update activity timestamp
     console.log('Processing direct mention...');
     const groupId = ctx.chat?.id.toString();
     const messageText = ctx.message?.text;
@@ -1324,6 +1377,9 @@ class GroupChatBot {
     try {
       console.log('Starting bot...', new Date().toISOString());
       
+      // Initialize last activity time
+      this.lastActivityTime = new Date();
+      
       // Add error handler for process termination
       process.on('SIGTERM', async () => {
         console.log('SIGTERM received. Shutting down gracefully...');
@@ -1350,17 +1406,18 @@ class GroupChatBot {
           allowed_updates: ['message', 'chat_member', 'poll']
         });
 
-        // Add periodic health check
+        // Add more frequent health checks
         setInterval(async () => {
           try {
             await this.bot.api.getMe();
-            console.log('Bot health check passed:', new Date().toISOString());
+            this.lastActivityTime = new Date();
+            console.log('Bot health check passed:', this.lastActivityTime.toISOString());
           } catch (error) {
             console.error('Bot health check failed:', error);
-            this.reconnectAttempts = 0; // Reset attempts for fresh start
-            throw error; // This will trigger the bot.catch handler
+            this.reconnectAttempts = 0;
+            throw error;
           }
-        }, 5 * 60 * 1000); // Check every 5 minutes
+        }, 2 * 60 * 1000); // Check every 2 minutes
 
       } catch (error: any) {
         if (error?.error_code === 409) {
