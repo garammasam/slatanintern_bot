@@ -484,16 +484,48 @@ class GroupChatBot {
   public async start() {
     try {
       console.log('Starting bot...');
+      
+      // Add error handler for process termination
+      process.on('SIGTERM', async () => {
+        console.log('SIGTERM received. Shutting down gracefully...');
+        await this.stop();
+        process.exit(0);
+      });
+
+      process.on('SIGINT', async () => {
+        console.log('SIGINT received. Shutting down gracefully...');
+        await this.stop();
+        process.exit(0);
+      });
+
       await this.bot.start({
         onStart: (botInfo) => {
           console.log('Bot connected successfully');
           console.log('Bot info:', botInfo);
-          this.reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+          this.reconnectAttempts = 0;
         },
+        drop_pending_updates: true, // Ignore updates from previous sessions
+        allowed_updates: ['message', 'chat_member', 'poll'] // Only listen for specific updates
       });
+    } catch (error: any) {
+      if (error?.error_code === 409) {
+        console.log('Another bot instance is running. Waiting for it to release...');
+        // Wait for 10 seconds before trying again
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        await this.start();
+      } else {
+        console.error('Failed to start bot:', error);
+        throw error;
+      }
+    }
+  }
+
+  public async stop() {
+    try {
+      console.log('Stopping bot...');
+      await this.bot.stop();
     } catch (error) {
-      console.error('Failed to start bot:', error);
-      throw error;
+      console.error('Error stopping bot:', error);
     }
   }
 }
