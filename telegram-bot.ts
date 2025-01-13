@@ -573,17 +573,44 @@ class GroupChatBot {
       const lastMessage = history[history.length - 1];
       const context = [];
 
-      // Check if the message is asking about an artist
-      const artistMatch = lastMessage?.content.match(/(?:about|who is|tell me about|info about|songs by|tracks by|catalog of)\s+([^\s?.,!]+)/i);
+      // Enhanced pattern matching for artist inquiries
+      const artistMatch = lastMessage?.content.toLowerCase().match(
+        /(?:about|who|what|tell|info|songs?|tracks?|catalog|music|lagu|dengar|check|tengok|cari)\s+(?:by|from|about|untuk|oleh|daripada)?\s*([a-zA-Z0-9\s_]+)/i
+      );
+
       if (artistMatch) {
-        const artistQuery = artistMatch[1];
+        console.log('Artist inquiry detected:', artistMatch[1]);
+        const artistQuery = artistMatch[1].trim();
         const artistInfo = await this.searchArtistInfo(artistQuery);
         
-        if (artistInfo.catalogs.length > 0) {
+        if (artistInfo.catalogs && artistInfo.catalogs.length > 0) {
+          console.log('Found catalog entries:', artistInfo.catalogs.length);
           context.push({
             role: "system",
             content: `Catalog tracks by ${artistQuery}: ${artistInfo.catalogs.map(track => 
               `${track.title} (${track.language}, ${track.duration}${track.link ? `, ${track.link}` : ''})`
+            ).join('; ')}`
+          });
+        } else {
+          console.log('No catalog entries found for:', artistQuery);
+        }
+
+        // Add shows information if available
+        if (artistInfo.shows && artistInfo.shows.length > 0) {
+          context.push({
+            role: "system",
+            content: `Shows featuring ${artistQuery}: ${artistInfo.shows.map(show => 
+              `${show.title} at ${show.venue} (${show.date})`
+            ).join('; ')}`
+          });
+        }
+
+        // Add projects information if available
+        if (artistInfo.projects && artistInfo.projects.length > 0) {
+          context.push({
+            role: "system",
+            content: `Projects involving ${artistQuery}: ${artistInfo.projects.map(project => 
+              `${project.title} (${project.status.toLowerCase()})`
             ).join('; ')}`
           });
         }
@@ -735,14 +762,14 @@ class GroupChatBot {
   }> {
     const normalizedQuery = artistQuery.toLowerCase().trim();
 
-    // Use Supabase's built-in text search for better performance
+    // Use Supabase's ilike for better text matching
     const [shows, projects, { data: catalogs }] = await Promise.all([
       this.getUpcomingShows(),
       this.getProjects(),
       supabase
         .from('catalogs')
         .select('*')
-        .textSearch('artist', normalizedQuery)
+        .ilike('artist::text', `%${normalizedQuery}%`) // Convert JSONB to text and use ilike
         .order('release_date', { ascending: false })
     ]);
 
