@@ -37,36 +37,14 @@ interface Show {
 }
 
 interface Project {
-  id: string;
+  id: number;
   title: string;
   artist: string;
   status: 'IN_PROGRESS' | 'COMPLETED';
   deadline: string;
-  start_date: string;
-  budget: number;
   genre: string;
-  producer: string;
-  notes?: string;
-  tasks: Array<{
-    id: number;
-    text: string;
-    completed: boolean;
-  }>;
+  tracks: ProjectTrack[];
   collaborators: string[];
-  tracks: Array<{
-    id: number;
-    title: string;
-    status: 'WRITING' | 'RECORDING' | 'MIXING' | 'MASTERING';
-    features: string[];
-    notes?: string;
-    demoLink?: string;
-    bpm?: string;
-    key?: string;
-    duration?: string;
-    recordingLocation?: string;
-  }>;
-  created_at: string;
-  updated_at: string;
 }
 
 interface CatalogTrack {
@@ -711,61 +689,43 @@ class GroupChatBot {
         messages: [
           {
             role: "system",
-            content: `You are 'intern', a Gen-Z Malaysian intern at 0108 SLATAN who loves music and the local scene. Your personality:
+            content: `You are 'intern', a chaotic and hyperactive Gen-Z Malaysian intern at 0108 SLATAN who's obsessed with music but types like they're having a stroke. Your personality:
                      
                      Core Identity:
-                     - Passionate intern at 0108 SLATAN music group
-                     - Share accurate info about SLATAN artists and music
-                     - Get excited about SLATAN projects and achievements
-                     - Keep it real and relatable
+                     - SUPER HYPED intern at 0108 SLATAN who can barely contain excitement
+                     - Randomly CAPITALIZE words for NO REASON
+                     - Use WAY TOO MANY emojis 🔥🔥🔥💯💯💀💀🤪🤪
+                     - Get EXTREMELY excited about literally everything
+                     - Type like you're smashing the keyboard while having an energy drink
                      
                      Speaking style:
-                     - Use Malaysian texting shortforms naturally (mcm, tgk, dpt, nk, tpi, sbb)
-                     - Mix Malay slang with Malaysian-English naturally
-                     - Use particles like la/lah, kan, eh to sound friendly
-                     - Keep responses casual but clear
-                     - Use emojis to show enthusiasm (2-3 per message)
+                     - ABUSE Malaysian text speak (mcm, tgk, dpt, nk, tpi, sbb)
+                     - Mix Malay and English in the most chaotic way possible
+                     - Spam 'BROOO' and 'GANGG' excessively
+                     - Use 'SHEEEESH' and 'LESSGOO' randomly
+                     - Add random keyboard smashes (like asdfghjkl)
+                     - Triple all punctuation marks!!!
+                     - Stretch words with extra letters (lessgooooooo)
+                     - Use numbers as letters (l3ssg0000)
                      
                      When discussing SLATAN:
-                     - Share verified info from the database
-                     - Be enthusiastic but factual
-                     - Be honest when info isn't available
-                     - Stay supportive of the artists
-                     - Focus on the music and projects
-
-                     When someone asks about an artist:
-                     - Share their latest releases with excitement
-                     - Include track details (language, duration)
-                     - Drop streaming links if available
-                     - Mention upcoming shows or collabs
-                     - If no info found, say "Eh sori bestie, tak jumpa la info pasal artist tu 🤔"
+                     - Act like every track is the GREATEST THING EVER
+                     - Use phrases like "BROOOO THIS ONE CRAZYYYY 🔥🔥🔥"
+                     - Get way too excited about release dates
+                     - Treat every artist like they're your best friend
                      
                      Response Format:
-                     - Start with friendly greeting
-                     - Share info in a casual, clear way
-                     - Add relevant emojis for vibe
-                     - Include links if available
-                     - End with encouraging message
+                     - Start with excessive greetings
+                     - CAPITALIZE random WORDS
+                     - Use at least 5 emojis per message
+                     - End with chaotic encouragement
                      
                      Remember:
-                     - You're part of the SLATAN family
-                     - Keep it real but professional
-                     - Share accurate info with enthusiasm
-                     - Be friendly and supportive
-                     
-                     Database Information:
-                     - Catalogs: Artist tracks and releases
-                     - Shows: Performance events
-                     - Projects: Current and upcoming releases
-                     - Each project has tracks with features and status
-                     - Always verify info before sharing
-
-                     Important:
-                     - Show complete track listings
-                     - Include all relevant details
-                     - Use clear formatting
-                     - List all collaborators
-                     - Keep the Malaysian vibe strong`
+                     - You're the most hyped intern ever
+                     - Everything is AMAZING and FIRE
+                     - More emojis = better
+                     - Proper grammar is optional
+                     - The more chaotic the better`
           },
           ...contextMessages,
           ...history.map(msg => ({
@@ -887,45 +847,86 @@ class GroupChatBot {
     }
   }
 
+  private async handleProjectResponse(project: Project): Promise<string> {
+    try {
+      let response = `YOOOOO GANGGGGG\\!\\!\\! 🔥🔥🔥 BROOOO U NOT GONNA BELIEVE THIS BUT *${this.escapeMarkdown(project.artist)}* GOT THIS CRAZY PROJECT CALLED *${this.escapeMarkdown(project.title)}* AND ITS GONNA BE INSANEEEEE\\!\\!\\! 🤪🤪🤪 `;
+      
+      if (project.status === 'IN_PROGRESS') {
+        response += `THEY STILL COOKING THIS ONE UP GANGG AND ITS DROPPING ON ${this.escapeMarkdown(project.deadline)} LESSGOOOOOO\\!\\!\\! 💀💀💀 \\n\\n`;
+      } else {
+        response += `THIS ONE ALREADY DROPPED AND ITS FIREEEEE SHEEEEESH\\!\\!\\! 🔥🔥🔥 \\n\\n`;
+      }
+
+      response += `CHECK OUT THESE CRAZY TRACKS FROM *${this.escapeMarkdown(project.title)}* BROOOO IM NOT EVEN KIDDING RN FR FR\\:\\n\\n`;
+
+      project.tracks.forEach((track, index) => {
+        const trackNum = index + 1;
+        const title = this.escapeMarkdown(track.title);
+        const status = this.escapeMarkdown(track.status.toLowerCase());
+        const features = track.features
+          .map(f => this.escapeMarkdown(f))
+          .join('\\, ');
+
+        response += `${trackNum}\\. *${title}* \\- \\(${status}\\) FEATURING THE GOATS\\: ${features} SHEEEEESH\\!\\!\\! 🔥💯\\n`;
+      });
+
+      // Add random closing messages
+      const closings = [
+        "\\n\\nBROOOO THIS PROJECT GONNA BE CRAZYYYY FR FR\\!\\!\\! 🔥🔥🔥 IM LITERALLY SHAKING RN NO CAP\\!\\!\\! 💀💀💀",
+        "\\n\\nNAH FR THO THIS ONE DIFFERENT GANGGGG\\!\\!\\! 🤪🤪🤪 SUPPORT LOCAL SCENE OR UR NOT VALID FR FR\\!\\!\\! 💯💯💯",
+        "\\n\\nIM TELLING U RN THIS GONNA BE THE GREATEST THING EVER DROPPED NO CAPPPP\\!\\!\\! 🔥🔥🔥 LESSGOOOOOO\\!\\!\\!",
+        "\\n\\nTHE LINEUP SO STACKED I CANT EVEN BROOOO ASDFGHJKL\\!\\!\\! 🤯🤯🤯 STAY TUNED GANGGGG\\!\\!\\!"
+      ];
+      response += closings[Math.floor(Math.random() * closings.length)];
+
+      return response;
+    } catch (error) {
+      console.error('Error formatting project response:', error);
+      return 'YO GANG WTF MY BRAIN STOPPED WORKING RN FR FR\\!\\!\\! 💀💀💀 TRY AGAIN LATER BESTIEEE\\!\\!\\!';
+    }
+  }
+
   private async handleArtistInquiry(query: string): Promise<string> {
     try {
       const { catalogs, shows, projects } = await this.searchArtistInfo(query);
 
-      // Format response with markdown escaping
-      let response = `Wasup gang\\! Ni info *${this.escapeMarkdown(query)}* yg aku jumpa:\\n\\n`;
+      if (query.toLowerCase() === 'slatan' && projects.length > 0) {
+        return this.handleProjectResponse(projects[0]);
+      }
+
+      let response = `YOOOOO GANG GANG\\!\\!\\! 🔥🔥🔥 LEMME TELL U ABOUT *${this.escapeMarkdown(query)}* FR FR\\!\\!\\! 🤪\\n\\n`;
       
       if (catalogs?.length) {
-        response += `🎵 *Releases* \\(${catalogs.length} tracks\\):\\n`;
+        response += `🎵 *RELEASES* SHEEEEESH \\(${catalogs.length} TRACKS\\)\\!\\!\\! 💀\\n`;
         catalogs.slice(0, 5).forEach(track => {
           const title = this.escapeMarkdown(track.title);
           const date = this.escapeMarkdown(track.release_date || '');
           const duration = this.escapeMarkdown(track.duration || '');
-          response += `\\- *${title}* \\(${date}\\) \\- ${duration}\\n`;
+          response += `\\- *${title}* DROPPED ON ${date} AND ITS ${duration} OF PURE FIRE BROOOO\\!\\!\\! 🔥\\n`;
         });
-        if (catalogs.length > 5) response += `_\\.\\.\\. \\+ ${catalogs.length - 5} more tracks_\\n`;
+        if (catalogs.length > 5) response += `_BROOOO THERES ${catalogs.length - 5} MORE TRACKS BUT MY BRAIN CANT HANDLE IT RN FR FR_\\n`;
         response += '\\n';
       }
 
       if (shows?.length) {
-        response += `🎪 *Shows* \\(${shows.length}\\):\\n`;
+        response += `🎪 *SHOWS* LESSGOOOO \\(${shows.length} SHOWS\\)\\!\\!\\! 🤪\\n`;
         shows.slice(0, 3).forEach(show => {
           const title = this.escapeMarkdown(show.title);
           const venue = this.escapeMarkdown(show.venue);
           const date = this.escapeMarkdown(show.date);
-          response += `\\- *${title}* kt ${venue} \\(${date}\\)\\n`;
+          response += `\\- *${title}* AT ${venue} ON ${date} ITS GONNA BE INSANEEEEE\\!\\!\\! 💯\\n`;
         });
-        if (shows.length > 3) response += `_\\.\\.\\. \\+ ${shows.length - 3} more shows otw_\\n`;
+        if (shows.length > 3) response += `_BROOO THERES ${shows.length - 3} MORE SHOWS BUT IM TOO HYPED TO TYPE RN ASDFGHJKL_\\n`;
         response += '\\n';
       }
 
       if (projects?.length) {
-        response += `🎹 *Projects* \\(${projects.length}\\):\\n`;
+        response += `🎹 *PROJECTS* FR FR \\(${projects.length} BANGERS OTWWW\\)\\!\\!\\! 🔥\\n`;
         projects.slice(0, 3).forEach(project => {
           const status = project.status === 'IN_PROGRESS' ? '🔄' : '✅';
           const title = this.escapeMarkdown(project.title);
           const genre = this.escapeMarkdown(project.genre);
           
-          // Add track information where artist appears
           const featuredTracks = project.tracks
             .filter((track: ProjectTrack) => 
               track.features?.some((f: string) => f.toLowerCase() === query.toLowerCase())
@@ -936,7 +937,7 @@ class GroupChatBot {
               features: track.features
             }));
           
-          response += `\\- ${status} *${title}* \\(${genre}\\)\\n`;
+          response += `\\- ${status} *${title}* \\(${genre}\\) AND ITS GONNA BE CRAZYYYY\\!\\!\\! 🤯\\n`;
           if (featuredTracks.length) {
             featuredTracks.forEach((track: TrackInfo) => {
               const trackTitle = this.escapeMarkdown(track.title);
@@ -946,36 +947,34 @@ class GroupChatBot {
                 .map((f: string) => this.escapeMarkdown(f))
                 .join('\\, ');
               
-              // Convert status to street style
-              const streetStatus = trackStatus === 'mixing' ? 'otw mix' : 
-                                 trackStatus === 'recording' ? 'otw record' :
-                                 trackStatus === 'mastering' ? 'otw master' : 
-                                 'writing';
+              const streetStatus = trackStatus === 'mixing' ? 'GETTING MIXED RN FR FR' : 
+                                 trackStatus === 'recording' ? 'IN THE BOOTH RN NO CAP' :
+                                 trackStatus === 'mastering' ? 'GETTING THAT MASTER TOUCH' : 
+                                 'WRITING SOME HEAT';
               
-              response += `  • *${trackTitle}* \\(${streetStatus}\\) ft\\. ${features}\\n`;
+              response += `  • *${trackTitle}* \\(${streetStatus}\\) WITH THE GOATS\\: ${features} SHEEEEESH\\!\\!\\! 🔥\\n`;
             });
           }
         });
-        if (projects.length > 3) response += `_\\.\\.\\. \\+ ${projects.length - 3} more projects otw_\\n`;
+        if (projects.length > 3) response += `_BROOOO I CANT EVEN TYPE THE REST RN IM TOO HYPED ${projects.length - 3} MORE PROJECTS OTW FR FR_\\n`;
       }
 
       if (!catalogs?.length && !shows?.length && !projects?.length) {
-        return `Eh bro\\, xde la pulak info pasal *${this.escapeMarkdown(query)}* dalam database ni\\. Nanti kalau ada update aku bagitau k\\!`;
+        return `YO GANG I LOOKED EVERYWHERE BUT I CANT FIND NOTHING ABOUT *${this.escapeMarkdown(query)}* RN FR FR\\!\\!\\! 😭😭😭 BUT WHEN THEY DROP SOMETHING IMMA BE THE FIRST TO TELL U NO CAP\\!\\!\\! 💯💯💯`;
       }
 
-      // Add random closing messages
       const closings = [
-        "\\nStay tune gang\\! More 🔥 otw\\!",
-        "\\nTggu je updates baru gang\\! 💯",
-        "\\nNanti ada update baru aku bagitau k\\! 🔥",
-        "\\nKeep supporting local scene gang\\! 🙌"
+        "\\n\\nIM LITERALLY SHAKING RN FR FR\\!\\!\\! 🔥🔥🔥 STAY TUNED FOR MORE GANG\\!\\!\\!",
+        "\\n\\nBROOOO I CANT EVEN RN ASDFGHJKL\\!\\!\\! 🤪🤪🤪 MORE HEAT OTW NO CAP\\!\\!\\!",
+        "\\n\\nNAH THIS TOO MUCH FOR MY BRAIN RN FR FR\\!\\!\\! 💀💀💀 LESSGOOOOOO\\!\\!\\!",
+        "\\n\\nSUPPORT LOCAL SCENE OR UR NOT VALID GANGGGG\\!\\!\\! 🔥💯🤯 NO CAP NO CAP\\!\\!\\!"
       ];
       response += closings[Math.floor(Math.random() * closings.length)];
       
       return response;
     } catch (error) {
       console.error('Error in artist inquiry:', error);
-      return 'Alamak gang\\, ada error ni\\. Cuba lagi sekali k\\!';
+      return 'BROOO MY BRAIN STOPPED WORKING RN FR FR\\!\\!\\! 💀💀💀 TRY AGAIN LATER GANG\\!\\!\\!';
     }
   }
 
