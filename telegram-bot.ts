@@ -655,7 +655,7 @@ class GroupChatBot {
 
   private escapeMarkdown(text: string): string {
     return text
-      .replace(/([_*\[\]()~`>#\+\-=|{}.!\\])/g, '\\$1') // Escape MarkdownV2 special characters
+      .replace(/([_*\[\]()~`>#+=|{}.!\\-])/g, '\\$1') // Escape MarkdownV2 special characters
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
@@ -1279,7 +1279,8 @@ class GroupChatBot {
       "Yo bro\\! Looking for SLATAN drip\\? @dataran\\.online on IG or dataran\\.online is the only official store\\! Get yours now\\! 💯"
     ];
     
-    return responses[Math.floor(Math.random() * responses.length)];
+    const response = responses[Math.floor(Math.random() * responses.length)];
+    return this.escapeMarkdown(response);
   }
 
   private handleSocialInquiry(): string {
