@@ -114,6 +114,19 @@ interface PollInfo {
   timer: NodeJS.Timeout;
 }
 
+interface ProjectTrack {
+  id: number;
+  title: string;
+  status: 'WRITING' | 'RECORDING' | 'MIXING' | 'MASTERING';
+  features: string[];
+  notes?: string;
+  demoLink?: string;
+  bpm?: string;
+  key?: string;
+  duration?: string;
+  recordingLocation?: string;
+}
+
 class GroupChatBot {
   private bot: Bot;
   private openai: OpenAI;
@@ -466,6 +479,22 @@ class GroupChatBot {
     } catch (error) {
       console.error('Error generating response:', error);
     }
+
+    // Check if message is asking about an artist/show/project
+    const messageTextLower = messageText?.toLowerCase() || '';
+    if (messageTextLower.includes('who is') || messageTextLower.includes('tell me about') || messageTextLower.includes('what about')) {
+      const query = messageTextLower
+        .replace('who is', '')
+        .replace('tell me about', '')
+        .replace('what about', '')
+        .trim();
+        
+      if (query) {
+        const response = await this.handleArtistInquiry(query);
+        await ctx.reply(response, { parse_mode: 'Markdown' });
+        return;
+      }
+    }
   }
   
   private async handleDirectMention(ctx: Context) {
@@ -785,21 +814,21 @@ class GroupChatBot {
       // Normalize the artist query for case-insensitive search
       const normalizedQuery = artistQuery.toLowerCase().trim();
       
-      // Search catalogs with proper query structure
+      // Search catalogs
       const { data: catalogs, error: catalogError } = await supabase
         .from('catalogs')
-        .select('*')
-        .or(`title.ilike.%${normalizedQuery}%,artist.cs.{"${normalizedQuery}"}`)
+        .select()
+        .contains('artist', [normalizedQuery])
         .order('release_date', { ascending: false });
 
       if (catalogError) {
         console.error('Error searching catalogs:', catalogError);
       }
 
-      // Search shows with proper array containment
+      // Search shows
       const { data: shows, error: showError } = await supabase
         .from('shows')
-        .select('*')
+        .select()
         .contains('artists', [normalizedQuery])
         .eq('status', 'upcoming')
         .order('date', { ascending: true });
@@ -808,21 +837,34 @@ class GroupChatBot {
         console.error('Error searching shows:', showError);
       }
 
-      // Search projects with proper query structure
-      const { data: projects, error: projectError } = await supabase
+      // Search projects - check artist, collaborators, and track features
+      const { data: allProjects, error: projectError } = await supabase
         .from('projects')
-        .select('*')
-        .or(`title.ilike.%${normalizedQuery}%,artist.ilike.%${normalizedQuery}%,collaborators.cs.{"${normalizedQuery}"}`)
-        .order('deadline', { ascending: true });
+        .select('*');
 
       if (projectError) {
         console.error('Error searching projects:', projectError);
+        return {
+          catalogs: catalogs || [],
+          shows: shows || [],
+          projects: []
+        };
       }
+
+      // Filter projects where artist appears in any capacity
+      const projects = allProjects.filter(project => {
+        const isMainArtist = project.artist.toLowerCase() === normalizedQuery;
+        const isCollaborator = project.collaborators.some((c: string) => c.toLowerCase() === normalizedQuery);
+        const isFeatureArtist = project.tracks.some((track: ProjectTrack) => 
+          track.features?.some((f: string) => f.toLowerCase() === normalizedQuery)
+        );
+        return isMainArtist || isCollaborator || isFeatureArtist;
+      });
 
       return {
         catalogs: catalogs || [],
         shows: shows || [],
-        projects: projects || []
+        projects: projects
       };
     } catch (error) {
       console.error('Error in searchArtistInfo:', error);
@@ -831,6 +873,66 @@ class GroupChatBot {
         shows: [],
         projects: []
       };
+    }
+  }
+
+  private async handleArtistInquiry(query: string): Promise<string> {
+    try {
+      // Use the existing searchArtistInfo function to get data
+      const { catalogs, shows, projects } = await this.searchArtistInfo(query);
+
+      // Format response with markdown escaping
+      let response = '';
+      
+      if (catalogs?.length) {
+        response += `🎵 *Releases* \\(${catalogs.length}\\):\\n`;
+        catalogs.slice(0, 5).forEach(track => {
+          const title = this.escapeMarkdown(track.title);
+          const date = this.escapeMarkdown(track.release_date);
+          response += `\\- ${title} \\(${date}\\)\\n`;
+        });
+        if (catalogs.length > 5) response += `_\\.\\.\\.and ${catalogs.length - 5} more releases_\\n`;
+        response += '\\n';
+      }
+
+      if (shows?.length) {
+        response += `🎪 *Shows* \\(${shows.length}\\):\\n`;
+        shows.slice(0, 3).forEach(show => {
+          const title = this.escapeMarkdown(show.title);
+          const venue = this.escapeMarkdown(show.venue);
+          const date = this.escapeMarkdown(show.date);
+          response += `\\- ${title} at ${venue} \\(${date}\\)\\n`;
+        });
+        if (shows.length > 3) response += `_\\.\\.\\.and ${shows.length - 3} more shows_\\n`;
+        response += '\\n';
+      }
+
+      if (projects?.length) {
+        response += `🎹 *Projects* \\(${projects.length}\\):\\n`;
+        projects.slice(0, 3).forEach(project => {
+          const status = project.status === 'IN_PROGRESS' ? '🔄' : '✅';
+          const title = this.escapeMarkdown(project.title);
+          const genre = this.escapeMarkdown(project.genre);
+          
+          // Add track information where artist appears
+          const featuredTracks = project.tracks
+            .filter((track: ProjectTrack) => 
+              track.features?.some((f: string) => f.toLowerCase() === query.toLowerCase())
+            )
+            .map((track: ProjectTrack) => track.title);
+          
+          response += `\\- ${status} ${title} \\(${genre}\\)\\n`;
+          if (featuredTracks.length) {
+            response += `  Featured in: ${featuredTracks.map((t: string) => this.escapeMarkdown(t)).join(', ')}\\n`;
+          }
+        });
+        if (projects.length > 3) response += `_\\.\\.\\.and ${projects.length - 3} more projects_\\n`;
+      }
+
+      return response || `No information found for "${this.escapeMarkdown(query)}"`;
+    } catch (error) {
+      console.error('Error in artist inquiry:', error);
+      return 'Sorry, there was an error processing your request\\.';
     }
   }
 
