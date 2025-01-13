@@ -658,8 +658,7 @@ class GroupChatBot {
       .replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&') // Escape MarkdownV2 special characters
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/https?:\/\//g, ''); // Remove http/https protocols from URLs
+      .replace(/>/g, '&gt;');
   }
 
   private async enrichResponseContext(groupId: string): Promise<any[]> {
@@ -1135,7 +1134,7 @@ class GroupChatBot {
     ];
 
     const greeting = modernGreetings[Math.floor(Math.random() * modernGreetings.length)];
-    return `${greeting}\n\nQuote of the day:\n\n"${quote.text}"\n- ${quote.author}\n\nLet's make today count! 💪 No cap, we going crazy! 🔥`;
+    return `${greeting}\n\nQuote of the day:\n\n"${this.escapeMarkdown(quote.text)}"\n- ${this.escapeMarkdown(quote.author)}\n\nLet's make today count! 💪 No cap, we going crazy! 🔥`;
   }
 
   private async setupNightGreeting() {
@@ -1175,7 +1174,7 @@ class GroupChatBot {
     ];
 
     const greeting = modernNightGreetings[Math.floor(Math.random() * modernNightGreetings.length)];
-    return `${greeting}\n\nNight thoughts:\n\n"${quote.text}"\n- ${quote.author}\n\nGet that rest fr fr! 💫 Tomorrow we go again! 🔥`;
+    return `${greeting}\n\nNight thoughts:\n\n"${this.escapeMarkdown(quote.text)}"\n- ${this.escapeMarkdown(quote.author)}\n\nGet that rest fr fr! 💫 Tomorrow we go again! 🔥`;
   }
 
   public async start() {
@@ -1308,15 +1307,15 @@ class GroupChatBot {
     ];
     
     const response = modernMerchResponses[Math.floor(Math.random() * modernMerchResponses.length)];
-    return this.escapeMarkdown(response);
+    return response;
   }
 
   private handleSocialInquiry(): string {
     const modernSocialResponses = [
-      "YO CHECK! 🔥 Follow SLATAN on Instagram @lebuhrayaselatan for all the latest updates! Real content only! 📱",
-      "Stay updated fr fr! Follow our IG @lebuhrayaselatan! We be posting heat! 🔥",
-      "Demo! Follow @lebuhrayaselatan on IG to stay in the loop! No cap! 💯",
-      "Don't miss out! @lebuhrayaselatan on Instagram is where all the action's at! 🔥"
+      "YO CHECK\\! 🔥 Follow SLATAN on Instagram @lebuhrayaselatan for all the latest updates\\! Real content only\\! 📱",
+      "Stay updated fr fr\\! Follow our IG @lebuhrayaselatan\\! We be posting heat\\! 🔥",
+      "Demo\\! Follow @lebuhrayaselatan on IG to stay in the loop\\! No cap\\! 💯",
+      "Don't miss out\\! @lebuhrayaselatan on Instagram is where all the action's at\\! 🔥"
     ];
     
     return modernSocialResponses[Math.floor(Math.random() * modernSocialResponses.length)];
