@@ -541,6 +541,33 @@ class GroupChatBot {
       console.log('Missing groupId or messageText in mention handler');
       return;
     }
+
+    const messageTextLower = messageText.toLowerCase();
+    
+    // Check for merchandise inquiries first
+    if (messageTextLower.includes('slatan') || messageTextLower.includes('0108')) {
+      if (this.merchKeywords.regex.test(messageTextLower)) {
+        console.log('Merchandise inquiry detected, sending merch response...');
+        const merchResponse = this.handleMerchInquiry();
+        await ctx.reply(merchResponse, {
+          reply_to_message_id: ctx.message.message_id,
+          parse_mode: 'MarkdownV2',
+          disable_web_page_preview: true
+        } as any);
+        return;
+      }
+      
+      if (this.socialKeywords.regex.test(messageTextLower)) {
+        console.log('Social media inquiry detected, sending social response...');
+        const socialResponse = this.handleSocialInquiry();
+        await ctx.reply(socialResponse, {
+          reply_to_message_id: ctx.message.message_id,
+          parse_mode: 'MarkdownV2',
+          disable_web_page_preview: true
+        } as any);
+        return;
+      }
+    }
     
     // Update conversation history
     this.updateMessageHistory(groupId, {
