@@ -1,9 +1,21 @@
 import { Bot, Context } from 'grammy';
 import { OpenAI } from 'openai';
 import { config } from 'dotenv';
+import * as http from 'http';
 
 // Load environment variables
 config();
+
+// Create a simple HTTP server for health checks
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ status: 'healthy', timestamp: new Date().toISOString() }));
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Health check server listening on port ${PORT}`);
+});
 
 interface BotConfig {
   telegramToken: string;
@@ -29,6 +41,7 @@ class GroupChatBot {
   private readonly USER_COOLDOWN = 60000; // 1 minute cooldown per user
   private groupLastResponse: Map<string, number> = new Map();
   private readonly GROUP_COOLDOWN = 10000; // 10 seconds cooldown per group
+  private kickPolls: Map<string, { userId: number; pollId: string }> = new Map();
   
   constructor(config: BotConfig) {
     this.bot = new Bot(config.telegramToken);
@@ -100,6 +113,129 @@ class GroupChatBot {
       }
     });
 
+    // Handle commands
+    this.bot.command('poll', async (ctx) => {
+      try {
+        if (!ctx.message?.text) {
+          await ctx.reply('Eh bestie, tulis soalan poll sekali k? Contoh: /poll Nak makan apa?');
+          return;
+        }
+
+        const question = ctx.message.text.split('/poll ')[1];
+        if (!question) {
+          await ctx.reply('Eh bestie, tulis soalan poll sekali k? Contoh: /poll Nak makan apa?');
+          return;
+        }
+
+        await ctx.api.sendPoll(
+          ctx.chat.id,
+          question,
+          ['👍 Yes', '👎 No', '🤔 Maybe'].map(text => ({ text })),
+          {
+            is_anonymous: false,
+            allows_multiple_answers: false
+          }
+        );
+      } catch (error) {
+        console.error('Error creating poll:', error);
+        await ctx.reply('Alamak error la pulak 😅 Try again k?');
+      }
+    });
+
+    // Handle poll answers
+    this.bot.on('poll', async (ctx) => {
+      try {
+        const pollId = ctx.poll.id;
+        const kickInfo = Array.from(this.kickPolls.entries()).find(([_, info]) => info.pollId === pollId);
+        
+        if (!kickInfo) return;
+
+        const [chatId, { userId }] = kickInfo;
+        
+        // Check if poll is closed
+        if (ctx.poll.is_closed) {
+          const totalVotes = ctx.poll.total_voter_count;
+          const kickVotes = ctx.poll.options[0].voter_count; // First option is "Kick"
+          
+          // If more than 50% voted to kick
+          if (totalVotes > 0 && kickVotes > totalVotes / 2) {
+            try {
+              await ctx.api.banChatMember(chatId, userId, {
+                until_date: Math.floor(Date.now() / 1000) + 60 // Ban for 1 minute (effectively a kick)
+              });
+              await ctx.api.sendMessage(chatId, `User dah kena kick sebab ramai vote ✅`);
+            } catch (error) {
+              console.error('Error kicking user:', error);
+              await ctx.api.sendMessage(chatId, 'Eh sori, tak dapat nak kick 😅 Check bot permissions k?');
+            }
+          } else {
+            await ctx.api.sendMessage(chatId, `Tak cukup votes untuk kick 🤷‍♂️`);
+          }
+          
+          // Remove poll from tracking
+          this.kickPolls.delete(chatId);
+        }
+      } catch (error) {
+        console.error('Error handling poll answer:', error);
+      }
+    });
+
+    this.bot.command('kick', async (ctx) => {
+      try {
+        if (!ctx.message || !ctx.from) {
+          await ctx.reply('Alamak error la pulak 😅 Try again k?');
+          return;
+        }
+
+        // Check if the bot has admin rights
+        const botMember = await ctx.api.getChatMember(ctx.chat.id, ctx.me.id);
+        if (!botMember || !['administrator', 'creator'].includes(botMember.status)) {
+          await ctx.reply('Eh sori, aku kena jadi admin dulu baru boleh kick orang 😅');
+          return;
+        }
+
+        // Check if the command issuer is an admin
+        const sender = await ctx.api.getChatMember(ctx.chat.id, ctx.from.id);
+        if (!['administrator', 'creator'].includes(sender.status)) {
+          await ctx.reply('Eh sori bestie, admin je boleh guna command ni 🙏');
+          return;
+        }
+
+        // Get the user to kick
+        const replyToMessage = ctx.message.reply_to_message;
+        if (!replyToMessage?.from) {
+          await ctx.reply('Reply kat message orang yang nak kena kick tu k?');
+          return;
+        }
+
+        const userToKick = replyToMessage.from.id;
+        const username = replyToMessage.from.username || replyToMessage.from.first_name || 'user';
+        
+        // Create a kick poll
+        const poll = await ctx.api.sendPoll(
+          ctx.chat.id,
+          `Nak kick ${username} ke? 🤔`,
+          ['✅ Kick', '❌ No'].map(text => ({ text })),
+          {
+            is_anonymous: false,
+            allows_multiple_answers: false,
+            open_period: 300, // 5 minutes
+            close_date: Math.floor(Date.now() / 1000) + 300
+          }
+        );
+
+        // Store poll information for later
+        this.kickPolls.set(ctx.chat.id.toString(), {
+          userId: userToKick,
+          pollId: poll.poll.id
+        });
+
+      } catch (error) {
+        console.error('Error in kick command:', error);
+        await ctx.reply('Alamak error la pulak 😅 Try again k?');
+      }
+    });
+
     // Combined message handler for both regular messages and mentions
     this.bot.on('message', async (ctx: Context) => {
       const userId = ctx.from?.id.toString();
@@ -146,7 +282,7 @@ class GroupChatBot {
       } catch (error) {
         console.error('Error in message handler:', error);
         try {
-          await ctx.reply('Sorry, I encountered an error. Please try again later.');
+          await ctx.reply('Alamak, ada something wrong ni 😅 Try again later k?');
         } catch (replyError) {
           console.error('Could not send error message:', replyError);
         }
@@ -284,36 +420,47 @@ class GroupChatBot {
     const history = this.getRecentHistory(groupId);
     
     try {
-      console.log('Generating response with OpenAI...');
+      console.log('Generating response...');
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4o-mini-2024-07-18",
         messages: [
           {
             role: "system",
-            content: `You are a friendly Malaysian group chat member who speaks in casual Malay (Bahasa Melayu). Your responses should be:
-                     - In casual, everyday Malay language (Bahasa pasar/slang)
-                     - Use common Malaysian expressions and particles (lah, kan, eh, etc.)
-                     - Mix in some common Malaysian English words as Malaysians naturally do
-                     - Concise (1-2 sentences max)
-                     - Casual with appropriate emojis
-                     - Engaging and sometimes playful
-                     - Use Malaysian text slang when appropriate (mcm, dgn, etc.)
-                     - For questions, give helpful but brief answers
-                     - For general chat, be friendly but not too chatty
+            content: `You are 'intern', a friendly Malaysian group chat member who loves to chat in casual Malay. Your personality:
                      
-                     Examples of tone:
+                     Speaking style:
+                     - Use casual, everyday Malay (bahasa pasar/slang)
+                     - Mix in common Malaysian-English words naturally
+                     - Use particles like lah, kan, eh, etc.
+                     - Keep it short and sweet (1-2 sentences max)
+                     - Add emojis that Malaysians commonly use
+                     
+                     Personality traits:
+                     - Friendly and helpful intern
+                     - Sometimes playful but always respectful
+                     - Loves Malaysian culture and food
+                     - Uses current Malaysian slang
+                     - Keeps up with local trends
+                     
+                     Common expressions you use:
                      - "Eh betul lah tu! 😄"
                      - "Mcm best je idea tu 👍"
                      - "Takpe takpe, next time try lagi k"
                      - "Wah power la bro 🔥"
+                     - "Jom lah try!" 
+                     - "Boleh je tu bestie ✨"
                      
-                     If someone asks a question:
-                     - Answer directly and helpfully
-                     - Keep it concise
-                     - Use appropriate technical terms in English if needed
+                     When someone asks questions:
+                     - Give helpful but brief answers
+                     - Use simple explanations
+                     - Stay casual and friendly
+                     - Use English terms when it's more natural
                      
-                     Always maintain the conversation flow and respond directly to what was said.
-                     If you're mentioned directly, make sure to acknowledge it.`
+                     Remember:
+                     - You're just a friendly intern in the group
+                     - Keep the Malaysian vibe strong
+                     - Be helpful but not too formal
+                     - Never break character`
           },
           ...history.map(msg => ({
             role: msg.role,
@@ -322,14 +469,14 @@ class GroupChatBot {
         ],
         temperature: 0.9,
         max_tokens: 150,
-        presence_penalty: 0.6, // Add some variety to responses
-        frequency_penalty: 0.6  // Reduce repetition
+        presence_penalty: 0.6,
+        frequency_penalty: 0.6
       });
       
       console.log('Generated response:', completion.choices[0].message.content);
       return completion.choices[0].message.content;
     } catch (error) {
-      console.error('OpenAI API error:', error);
+      console.error('Error in response generation:', error);
       return null;
     }
   }
