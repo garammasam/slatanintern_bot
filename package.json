@@ -13,13 +13,14 @@
     "grammy": "^1.21.1",
     "openai": "^4.24.1",
     "dotenv": "^16.3.1",
-    "@types/node": "^20.10.6",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "@types/node": "^20.10.6"
   },
   "devDependencies": {
     "ts-node": "^10.9.2"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.x",
+    "npm": ">=9.0.0"
   }
 } 
