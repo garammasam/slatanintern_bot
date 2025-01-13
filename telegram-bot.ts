@@ -849,15 +849,15 @@ class GroupChatBot {
 
   private async handleProjectResponse(project: Project): Promise<string> {
     try {
-      let response = `Yo gang\\! 🔥 Check out this crazy project from *${this.escapeMarkdown(project.artist)}* called *${this.escapeMarkdown(project.title)}*\\! `;
+      let response = `YOOO GANG\\! 🔥 BROO check out this INSANE project from *${this.escapeMarkdown(project.artist)}* called *${this.escapeMarkdown(project.title)}*\\! 🤪 `;
       
       if (project.status === 'IN_PROGRESS') {
-        response += `They're still working on it and dropping on ${this.escapeMarkdown(project.deadline)}\\. 💫\\n\\n`;
+        response += `They still COOKING THIS ONE UP fr fr and dropping on ${this.escapeMarkdown(project.deadline)} LESGOOO\\! 💀\\n\\n`;
       } else {
-        response += `It's out now and it's straight fire\\! 🔥\\n\\n`;
+        response += `IT'S OUT NOW AND IT'S ABSOLUTE FIRE SHEEESH\\! 🔥\\n\\n`;
       }
 
-      response += `Here's what's coming in *${this.escapeMarkdown(project.title)}*\\:\\n\\n`;
+      response += `CHECK OUT these CRAZY tracks from *${this.escapeMarkdown(project.title)}* fr fr\\:\\n\\n`;
 
       project.tracks.forEach((track, index) => {
         const trackNum = index + 1;
@@ -867,21 +867,21 @@ class GroupChatBot {
           .map(f => this.escapeMarkdown(f))
           .join('\\, ');
 
-        response += `${trackNum}\\. *${title}* \\- \\(${status}\\) ft\\. ${features} 🎵\\n`;
+        response += `${trackNum}\\. *${title}* \\- \\(${status}\\) with the GOATS\\: ${features} SHEEESH\\! 🔥\\n`;
       });
 
       const closings = [
-        "\\n\\nThis project's gonna be something special fr\\! 🔥 Stay locked in gang\\!",
-        "\\n\\nCan't wait for everyone to hear this one\\! 💫 Support local scene\\!",
-        "\\n\\nThe lineup is crazy stacked fr fr\\! 🎵 More updates coming soon\\!",
-        "\\n\\nThis one's gonna hit different\\! 🔥 Tggu je gang\\!"
+        "\\n\\nNAH FR THIS PROJECT GONNA BE DIFFERENT\\! 🔥 Stay locked in gang NO CAP\\!",
+        "\\n\\nIM TELLING U RN this one's gonna be CRAZY\\! 💫 SUPPORT LOCAL SCENE FR FR\\!",
+        "\\n\\nTHE LINEUP IS ACTUALLY INSANE BRO\\! 🎵 More heat otw SHEEESH\\!",
+        "\\n\\nCANT EVEN HANDLE HOW FIRE THIS IS\\! 🔥 TGGU JE GANG\\!"
       ];
       response += closings[Math.floor(Math.random() * closings.length)];
 
       return response;
     } catch (error) {
       console.error('Error formatting project response:', error);
-      return 'Eh sori gang\\, something went wrong\\. Try again later k\\!';
+      return 'YO GANG my brain stopped working fr fr\\! 💀 Try again later bestieee\\!';
     }
   }
 
@@ -893,34 +893,34 @@ class GroupChatBot {
         return this.handleProjectResponse(projects[0]);
       }
 
-      let response = `Yo gang\\! 🔥 Let me tell you about *${this.escapeMarkdown(query)}*\\:\\n\\n`;
+      let response = `YOOO GANG\\! 🔥 Let me put u on about *${this.escapeMarkdown(query)}* FR FR\\! 🤪\\n\\n`;
       
       if (catalogs?.length) {
-        response += `🎵 *Releases* \\(${catalogs.length} tracks\\)\\:\\n`;
+        response += `🎵 *RELEASES* SHEEESH \\(${catalogs.length} TRACKS\\)\\! 💀\\n`;
         catalogs.slice(0, 5).forEach(track => {
           const title = this.escapeMarkdown(track.title);
           const date = this.escapeMarkdown(track.release_date || '');
           const duration = this.escapeMarkdown(track.duration || '');
-          response += `\\- *${title}* dropped on ${date} \\(${duration}\\) 🎵\\n`;
+          response += `\\- *${title}* DROPPED ON ${date} and its ${duration} of PURE HEAT\\! 🔥\\n`;
         });
-        if (catalogs.length > 5) response += `_\\+ ${catalogs.length - 5} more tracks in the catalog_\\n`;
+        if (catalogs.length > 5) response += `_NAH FR we got ${catalogs.length - 5} MORE TRACKS but my brain cant handle it rn fr fr_\\n`;
         response += '\\n';
       }
 
       if (shows?.length) {
-        response += `🎪 *Shows* \\(${shows.length}\\)\\:\\n`;
+        response += `🎪 *SHOWS* LESGOOO \\(${shows.length}\\)\\! 🤪\\n`;
         shows.slice(0, 3).forEach(show => {
           const title = this.escapeMarkdown(show.title);
           const venue = this.escapeMarkdown(show.venue);
           const date = this.escapeMarkdown(show.date);
-          response += `\\- *${title}* at ${venue} on ${date} 💫\\n`;
+          response += `\\- *${title}* at ${venue} on ${date} ITS GONNA BE CRAZY\\! 💫\\n`;
         });
-        if (shows.length > 3) response += `_\\+ ${shows.length - 3} more shows coming up_\\n`;
+        if (shows.length > 3) response += `_BROO we got ${shows.length - 3} MORE SHOWS but im too hyped rn fr fr_\\n`;
         response += '\\n';
       }
 
       if (projects?.length) {
-        response += `🎹 *Projects* \\(${projects.length}\\)\\:\\n`;
+        response += `🎹 *PROJECTS* FR FR \\(${projects.length} BANGERS OTW\\)\\! 🔥\\n`;
         projects.slice(0, 3).forEach(project => {
           const status = project.status === 'IN_PROGRESS' ? '🔄' : '✅';
           const title = this.escapeMarkdown(project.title);
@@ -936,7 +936,7 @@ class GroupChatBot {
               features: track.features
             }));
           
-          response += `\\- ${status} *${title}* \\(${genre}\\)\\n`;
+          response += `\\- ${status} *${title}* \\(${genre}\\) THIS ONE GONNA BE INSANE\\! 🤯\\n`;
           if (featuredTracks.length) {
             featuredTracks.forEach((track: TrackInfo) => {
               const trackTitle = this.escapeMarkdown(track.title);
@@ -946,34 +946,34 @@ class GroupChatBot {
                 .map((f: string) => this.escapeMarkdown(f))
                 .join('\\, ');
               
-              const streetStatus = trackStatus === 'mixing' ? 'in the mix' : 
-                                 trackStatus === 'recording' ? 'recording' :
-                                 trackStatus === 'mastering' ? 'mastering' : 
-                                 'writing';
+              const streetStatus = trackStatus === 'mixing' ? 'GETTING THAT CRAZY MIX RN' : 
+                                 trackStatus === 'recording' ? 'IN THE BOOTH NO CAP' :
+                                 trackStatus === 'mastering' ? 'GETTING THAT MASTER TOUCH FR' : 
+                                 'WRITING SOME HEAT';
               
-              response += `  • *${trackTitle}* \\(${streetStatus}\\) ft\\. ${features}\\n`;
+              response += `  • *${trackTitle}* \\(${streetStatus}\\) with the GOATS\\: ${features} SHEEESH\\!\\n`;
             });
           }
         });
-        if (projects.length > 3) response += `_\\+ ${projects.length - 3} more projects otw_\\n`;
+        if (projects.length > 3) response += `_NAH FR we got ${projects.length - 3} MORE PROJECTS but im too gassed rn fr fr_\\n`;
       }
 
       if (!catalogs?.length && !shows?.length && !projects?.length) {
-        return `Eh sori gang\\, tak jumpa info pasal *${this.escapeMarkdown(query)}* dalam database\\. Will let you know when they drop something\\! 💫`;
+        return `YO GANG I looked EVERYWHERE but cant find nothing bout *${this.escapeMarkdown(query)}* rn fr fr\\! 😭 BUT WHEN THEY DROP SOMETHING IMMA BE THE FIRST TO TELL U NO CAP\\! 💯`;
       }
 
       const closings = [
-        "\\n\\nStay tuned for more updates gang\\! 🔥",
-        "\\n\\nMore heat coming soon fr fr\\! 💫",
-        "\\n\\nKeep supporting local scene gang\\! 🎵",
-        "\\n\\nTggu je for the next drop\\! 🔥"
+        "\\n\\nIM ACTUALLY SHAKING RN FR FR\\! 🔥 STAY TUNED FOR MORE GANG\\!",
+        "\\n\\nNAH THIS TOO MUCH HEAT FR\\! 🤪 MORE BANGERS OTW NO CAP\\!",
+        "\\n\\nCANT EVEN HANDLE ALL THIS HEAT RN\\! 💀 LESGOOO\\!",
+        "\\n\\nSUPPORT LOCAL SCENE OR UR NOT VALID FR FR\\! 🔥 NO CAP NO CAP\\!"
       ];
       response += closings[Math.floor(Math.random() * closings.length)];
       
       return response;
     } catch (error) {
       console.error('Error in artist inquiry:', error);
-      return 'Eh sori gang\\, something went wrong\\. Try again later k\\!';
+      return 'YO GANG my brain stopped working fr fr\\! 💀 Try again later bestieee\\!';
     }
   }
 
