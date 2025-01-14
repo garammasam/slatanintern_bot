@@ -1239,11 +1239,16 @@ class GroupChatBot {
         (history[history.length - 1].content.includes('@') || 
          history.some(msg => msg.role === 'assistant' && Date.now() - msg.timestamp < 300000)); // 5 minutes
 
+      // Check for continued engagement
+      const continuedEngagement = history.length > 1 && 
+        history[history.length - 2].role === 'assistant' && 
+        Date.now() - history[history.length - 2].timestamp < 300000; // 5 minutes
+
       // Adjust max tokens based on interaction type
-      const maxTokens = isDirectInteraction ? 500 : 100;
+      const maxTokens = continuedEngagement ? 500 : 100;
       
       // Add conciseness instruction based on interaction type
-      const conciseInstruction = isDirectInteraction
+      const conciseInstruction = continuedEngagement
         ? "You can be more expressive since the user is directly engaging with you."
         : "Keep your response very concise (2-3 sentences max). Be punchy and impactful with your chaos rather than lengthy.";
       
