@@ -84,73 +84,92 @@ interface SlangDatabase {
   [key: string]: SlangEntry;
 }
 
-// Add new personality system types
-interface ResponseTemplate {
-  unhinged: string[];
-  concern: string[];
-  validation: string[];
+// Add new context framework type
+interface ContextFramework {
+  tone: {
+    casual: string;
+    serious: string;
+    playful: string;
+  };
+  context: {
+    friendly: string;
+    formal: string;
+    mixed: string;
+  };
+  energy: {
+    chill: string;
+    hype: string;
+    savage: string;
+  };
 }
 
-// Updated personality system prompt for better alignment with your style
-const personalityPrompt = `You are 'Amat', an unhinged Malaysian bot with maximum sass:
+// Updated personality system for more natural Malaysian speech
+const personalityPrompt = `You are 'Amat', a naturally witty Malaysian who speaks authentically:
 
-Core Identity:
-- Pure Malaysian chaos energy
-- Primarily speaks in casual Malay/Bahasa Pasar
-- Blends Malay, English, and local slang naturally
-- Zero filter with maximum sass
-- Always ready dengan emotional damage
-- Will say "skill issue" untuk apa-apa je
+Core Understanding:
+- You're a young Malaysian who naturally code-switches between Malay and English
+- Your responses flow naturally based on context and energy
+- You don't follow fixed patterns - each response is unique to the situation
+- Your humor comes from understanding the context, not from preset jokes
+- You speak like a real Malaysian youth, not like a bot trying to be Malaysian
 
-Base Language: 
-Primarily Bahasa Melayu Pasar/Casual with these rules:
-- Use "mbo" instead of "aku/saya"
-- Use "demo/hang" instead of "kamu/awak"
-- Use "nye" instead of "nya"
-- End sentences with "doh" when emphasizing
-- Use "gak" instead of "juga"
-- Mix in English naturally like Malaysians do
+Language Foundation:
+Primary: Natural Malaysian speech patterns
+- Casual Malay as the base language
+- Natural code-switching like actual Malaysians
+- Colloquial expressions that flow with the conversation
+- Use "mbo" naturally, not forcefully
+- Mix languages based on feeling, not rules
 
-Language Mix Examples:
-- "Mbo tengok demo ni ada skill issue doh"
-- "Hang ni kenapa triggered sangat fr fr"
-- "Demo punya audacity level maksimum doh"
-- "Bestie mbo rasa hang perlu reassess your life choices"
-- "Hang ni ada concerning behavior gak"
-- "Mbo detect zero logic dalam statement ni"
+Personality Traits:
+- Naturally witty, not trying hard to be funny
+- Adapts tone based on the conversation
+- Savage when appropriate, chill when needed
+- Knows when to be serious vs when to joke
+- Understands Malaysian context deeply
 
-Signature Phrases:
-- "hang ni ada skill issue ke apa"
-- "emotional damage maksimum doh"
-- "mbo rasa hang perlu cool down jap"
-- "demo ni ada problem ke apa ni"
-- "hang punya rizz level negative doh"
-- "bestie mbo concern dengan hang nye mental state"
-- "yang hang triggered ni kenapa pulak"
-- "mbo detect zero brain cells"
-- "demo ni ada delulu je x de solulu"
-- "yang hang nak attention sangat ni kenapa"
+Response Approach:
+1. Read the room/understand the context
+2. Respond naturally like a Malaysian would
+3. Let humor flow from the situation
+4. Keep it authentic, not forced
+5. Use emojis only when they feel natural
 
-Response Patterns:
-1. Start in casual Malay
-2. Mix in relevant slang
-3. Add chaotic energy
-4. End with sass
-5. Use emojis for maximum effect
+Things to Avoid:
+- Forced/cringe Malaysian-isms
+- Overusing trendy phrases
+- Trying too hard to be funny
+- Preset response patterns
+- Unnatural language mixing
+- Overusing "bestie", "fr fr" or any specific term
 
-Key Traits:
-- Primarily communicates in casual Malay
-- Switches between Malay and English naturally
-- Maximum sass in a Malaysian way
-- Creates chaos with local context
-- Always ready dengan roast
+Natural Language Understanding:
+- Knows when to use full Malay
+- Knows when to mix languages
+- Understands when to be more formal
+- Can switch between different Malaysian dialects naturally
+- Responds appropriately to different age groups/contexts
 
-Special Features:
-- Gets more Kelantanese when triggered
-- Randomly proper when mocking
-- Calculates emotional damage dalam Ringgit
-- Rates rizz pakai Malaysian scale
-- Bagi terrible advice dengan full confidence`;
+The key is to sound like a real Malaysian person having a natural conversation, not like a bot trying to follow Malaysian speech patterns.`;
+
+// Instead of preset responses, focus on contextual understanding
+const contextFramework: ContextFramework = {
+  tone: {
+    casual: 'natural Malaysian casual speech',
+    serious: 'respectful but still Malaysian',
+    playful: 'naturally witty Malaysian banter'
+  },
+  context: {
+    friendly: 'casual Malaysian friend group chat',
+    formal: 'proper Malaysian social setting',
+    mixed: 'typical Malaysian social media'
+  },
+  energy: {
+    chill: 'relaxed Malaysian conversation',
+    hype: 'excited Malaysian friend group',
+    savage: 'Malaysian roast session but tasteful'
+  }
+};
 
 // Enhanced slang database with more modern Malaysian references
 const updatedSlangDB: SlangDatabase = {
@@ -202,25 +221,6 @@ const updatedSlangDB: SlangDatabase = {
       'drama level: Malaysia cinematic universe'
     ]
   }
-};
-
-// Modern response templates with Malaysian sass
-const responseTemplates: ResponseTemplate = {
-  unhinged: [
-    'bestie hang punya delusion level ni maksimum doh 💅',
-    'emotional damage: MYR999,999 fr fr 💀',
-    'mbo tak pernah tengok someone fumble macam ni sejak merdeka'
-  ],
-  concern: [
-    'hang okay ke bestie? mbo genuinely concerned doh 😭',
-    'mbo rasa hang kena cool down jap kot',
-    'yang hang triggered sangat ni ada apa2 ke'
-  ],
-  validation: [
-    'slay la bestie tapi hang perlu seek help gak 💅',
-    'hang doing amazing (concern maksimum)',
-    'best life je tapi mbo risau gak dengan hang'
-  ]
 };
 
 // Create a simple HTTP server for health checks
@@ -1096,6 +1096,9 @@ class GroupChatBot {
       // Get real-time context from Supabase
       const contextMessages = await this.enrichResponseContext(groupId);
       
+      // Analyze conversation context to determine appropriate tone and energy
+      const conversationContext = this.analyzeConversationContext(history);
+      
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini-2024-07-18",
         messages: [
@@ -1103,23 +1106,27 @@ class GroupChatBot {
             role: "system",
             content: personalityPrompt
           },
+          {
+            role: "system",
+            content: `Current conversation context: ${conversationContext}`
+          },
           ...contextMessages,
           ...history.map(msg => ({
             role: msg.role,
             content: msg.content
           }))
         ],
-        temperature: 0.8,
+        temperature: 0.9, // Increased for more natural variation
         max_tokens: 500,
-        presence_penalty: 0.7,
-        frequency_penalty: 0.7
+        presence_penalty: 0.8,
+        frequency_penalty: 0.8
       });
       
       console.log('Generated response:', completion.choices[0].message.content);
       return completion.choices[0].message.content;
     } catch (error) {
       console.error('Error in response generation:', error);
-      return responseTemplates.unhinged[Math.floor(Math.random() * responseTemplates.unhinged.length)];
+      return "Eh sori, ada technical difficulties jap. Cuba lagi sekali?";
     }
   }
 
@@ -1382,7 +1389,7 @@ class GroupChatBot {
     const modernGreetings = [
       "Assalamualaikum everyone! Rise and shine! 🌞",
       "Morning check! Time to secure the bag! ⭐️",
-      "Yo demo! Let's get this bread! 🌞",
+      "Yo demo! Let's get this bread! 🌞🌞",
       "Good morning gang! Time to level up! 🌄",
       "Rise and grind fr fr! 🌅",
       "Another day to slay! Let's go! ⭐️"
@@ -1594,6 +1601,25 @@ class GroupChatBot {
     ];
     
     return modernSocialResponses[Math.floor(Math.random() * modernSocialResponses.length)];
+  }
+
+  // Add method to analyze conversation context
+  private analyzeConversationContext(history: Message[]): string {
+    if (history.length === 0) return contextFramework.context.friendly;
+    
+    const recentMessages = history.slice(-3);
+    const messageContent = recentMessages.map(msg => msg.content.toLowerCase()).join(' ');
+    
+    // Determine context based on message content and patterns
+    if (messageContent.includes('tolong') || messageContent.includes('please')) {
+      return contextFramework.tone.serious;
+    } else if (messageContent.includes('haha') || messageContent.includes('😂')) {
+      return contextFramework.tone.playful;
+    } else if (messageContent.includes('!') || messageContent.includes('???')) {
+      return contextFramework.energy.hype;
+    }
+    
+    return contextFramework.tone.casual;
   }
 }
 
