@@ -1206,38 +1206,16 @@ class GroupChatBot {
         response += '\n';
       }
 
+      // More subtle handling of projects
       if (projects?.length) {
-        response += `🎹 PROJECTS FR FR (${projects.length} BANGERS OTW)! 🔥\n`;
-        projects.slice(0, 3).forEach(project => {
-          const status = project.status === 'IN_PROGRESS' ? '🔄' : '✅';
-          
-          const featuredTracks = project.tracks
-            .filter((track: ProjectTrack) => 
-              track.features?.some((f: string) => f.toLowerCase() === query.toLowerCase())
-            )
-            .map((track: ProjectTrack) => ({
-              title: track.title,
-              status: track.status,
-              features: track.features
-            }));
-          
-          response += `- ${status} ${project.title} (${project.genre}) THIS ONE GONNA BE INSANE! 🤯\n`;
-          if (featuredTracks.length) {
-            featuredTracks.forEach((track: TrackInfo) => {
-              const features = track.features
-                .filter((f: string) => f.toLowerCase() !== query.toLowerCase())
-                .join(', ');
-              
-              const streetStatus = track.status.toLowerCase() === 'mixing' ? 'GETTING THAT CRAZY MIX RN' : 
-                                 track.status.toLowerCase() === 'recording' ? 'IN THE BOOTH NO CAP' :
-                                 track.status.toLowerCase() === 'mastering' ? 'GETTING THAT MASTER TOUCH FR' : 
-                                 'WRITING SOME HEAT';
-              
-              response += `  • ${track.title} (${streetStatus}) with the GOATS: ${features} SHEEESH!\n`;
-            });
-          }
-        });
-        if (projects.length > 3) response += `NAH FR we got ${projects.length - 3} MORE PROJECTS but im too gassed rn fr fr\n`;
+        const completedProjects = projects.filter(p => p.status === 'COMPLETED');
+        if (completedProjects.length) {
+          response += `🎹 RELEASED PROJECTS (${completedProjects.length})! 🔥\n`;
+          completedProjects.slice(0, 2).forEach(project => {
+            response += `- ✅ ${project.title} (${project.genre}) ABSOLUTE HEAT! 🤯\n`;
+          });
+          if (completedProjects.length > 2) response += `AND MORE BANGERS YOU GOTTA CHECK OUT FR FR!\n`;
+        }
       }
 
       if (!catalogs?.length && !shows?.length && !projects?.length) {
@@ -1246,7 +1224,7 @@ class GroupChatBot {
 
       const closings = [
         "\n\nIM ACTUALLY SHAKING RN FR FR! 🔥 STAY TUNED FOR MORE GANG!",
-        "\n\nNAH THIS TOO MUCH HEAT FR! 🤪 MORE BANGERS OTW NO CAP!",
+        "\n\nNAH THIS TOO MUCH HEAT FR! 🤪 MORE COMING SOON NO CAP!",
         "\n\nCANT EVEN HANDLE ALL THIS HEAT RN! 💀 LESGOOO!",
         "\n\nSUPPORT LOCAL SCENE OR UR NOT VALID FR FR! 🔥 NO CAP NO CAP!"
       ];
