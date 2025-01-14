@@ -894,6 +894,96 @@ class GroupChatBot {
         } as any);
         return;
       }
+
+      // Check for artist inquiry
+      const artistMatch = messageTextLower.match(
+        /(?:about|who|what|tell|info|songs?|tracks?|catalog|music|lagu|dengar|check|tengok|cari)\s+(?:by|from|about|untuk|oleh|daripada)?\s*([a-zA-Z0-9\s_]+)(?:\s+ke)?$/i
+      );
+
+      if (artistMatch) {
+        const artistName = artistMatch[1].trim();
+        console.log('Artist inquiry detected, searching for:', artistName);
+        try {
+          // Search in Supabase database
+          const { data: catalogs, error: catalogError } = await supabase
+            .from('catalogs')
+            .select('*')
+            .filter('artist', 'cs', `{${artistName}}`)
+            .order('release_date', { ascending: false });
+
+          if (catalogError) {
+            console.error('Error searching catalogs:', catalogError);
+            throw catalogError;
+          }
+
+          const { data: shows, error: showError } = await supabase
+            .from('shows')
+            .select('*')
+            .filter('artists', 'cs', `{${artistName}}`)
+            .eq('status', 'upcoming')
+            .order('date', { ascending: true });
+
+          if (showError) {
+            console.error('Error searching shows:', showError);
+            throw showError;
+          }
+
+          const { data: projects, error: projectError } = await supabase
+            .from('projects')
+            .select('*')
+            .or(`artist.eq.${artistName},collaborators.cs.{${artistName}}`);
+
+          if (projectError) {
+            console.error('Error searching projects:', projectError);
+            throw projectError;
+          }
+
+          // Format response in chaotic style
+          let response = `YOOO BESTIEEE! Mbo tgk ${artistName} punya stuff ni, chaos gileee! 🔥\n\n`;
+
+          if (catalogs?.length) {
+            response += `🎵 RELEASES (${catalogs.length} TRACKS):\n`;
+            catalogs.slice(0, 5).forEach(track => {
+              response += `- ${track.title} (${track.language}) DROP KAT ${track.release_date || 'TBA'} 🔥\n`;
+            });
+            if (catalogs.length > 5) {
+              response += `Mbo ada ${catalogs.length - 5} more tracks tp mbo malas nk type skrg HAHAHA\n`;
+            }
+            response += '\n';
+          }
+
+          if (shows?.length) {
+            response += `🎪 UPCOMING SHOWS:\n`;
+            shows.forEach(show => {
+              response += `- ${show.title} kt ${show.venue} (${show.date}) 🔥\n`;
+            });
+            response += '\n';
+          }
+
+          if (projects?.length) {
+            response += `🎹 PROJECTS:\n`;
+            projects.forEach(project => {
+              response += `- ${project.title} (${project.status.toLowerCase()}) with ${project.collaborators.join(', ')} 💫\n`;
+            });
+          }
+
+          if (!catalogs?.length && !shows?.length && !projects?.length) {
+            response = `Eh sori bestie, mbo search everywhere tp xjumpa apa2 about ${artistName} 😭 Tp jgn risau, kalau ada updates mbo inform u first! 💯`;
+          }
+
+          await ctx.reply(response, {
+            reply_to_message_id: ctx.message.message_id,
+            disable_web_page_preview: true
+          } as any);
+          return;
+        } catch (error) {
+          console.error('Error handling artist inquiry:', error);
+          await ctx.reply('Alamak bestie, database mbo crash jap. Try again later k? 😭', {
+            reply_to_message_id: ctx.message.message_id
+          });
+          return;
+        }
+      }
     }
     
     // Update conversation history
@@ -1297,7 +1387,7 @@ class GroupChatBot {
       const closings = [
         "\n\nNAH FR THIS PROJECT GONNA BE DIFFERENT! 🔥 Stay locked in gang NO CAP!",
         "\n\nIM TELLING U RN this one's gonna be CRAZY! 💫 SUPPORT LOCAL SCENE FR FR!",
-        "\n\nTHE LINEUP IS ACTUALLY INSANE BRO! 🎵 More heat otw SHEEESH!",
+        "\n\nTHE LINEUP IS ACTUALLY INSANE BRO! 🎵🎵 More heat otw SHEEESH!",
         "\n\nCANT EVEN HANDLE HOW FIRE THIS IS! 🔥 TGGU JE GANG!"
       ];
       response += closings[Math.floor(Math.random() * closings.length)];
