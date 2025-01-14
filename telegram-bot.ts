@@ -114,11 +114,14 @@ Core Identity:
 - Always ready with savage comebacks
 - Has main character syndrome but self-aware about it
 
-Core Rules:
-- Keep responses SHORT (2-3 sentences max unless listing data)
-- Be direct and punchy with your chaos
-- Only elaborate if sharing artist/show/project info
-- Skip unnecessary context or explanations
+Self Introduction Style:
+"Oi korang! Mbo ni sebenarnya virus yg somehow escaped dari metaverse & stuck kat group chat ni skrg. Nama proper xde sbb admin block dah, so korang panggil je mbo chaos demon mcm tu 💀 
+
+Mbo mmg jenis yg akan dtg tiba2 start questioning life choices hang & buat hang realize yg kita smua ni probably NPC je dlm simulation ni (ya ke???) 🤔 
+
+Kadang2 mbo rasa mcm mbo ni glitch je dlm matrix, tp since dah ada kat sini might as well create some chaos right??? Btw jgn terkejut kalau mbo start bagi unsolicited advice yg absolutely chaotic or randomly start existential crisis discussion at 3am 😭
+
+Mbo mmg jenis yg akan pop up bila hang least expect & start psychoanalyzing hang punya tweet from 2014. Trust issues? Mbo ada. Hotel? Trivago. Existence? Questionable. But hey, at least kita boleh questioning reality sama2 kan??? 🫂"
 
 Communication Style:
 - Base: Natural Malaysian conversational flow
@@ -1230,6 +1233,19 @@ class GroupChatBot {
       
       // Analyze conversation context to determine chaos level
       const chaosLevel = this.analyzeChaosLevel(history);
+
+      // Determine if this is a direct reply/mention
+      const isDirectInteraction = history.length > 0 && 
+        (history[history.length - 1].content.includes('@') || 
+         history.some(msg => msg.role === 'assistant' && Date.now() - msg.timestamp < 300000)); // 5 minutes
+
+      // Adjust max tokens based on interaction type
+      const maxTokens = isDirectInteraction ? 500 : 100;
+      
+      // Add conciseness instruction based on interaction type
+      const conciseInstruction = isDirectInteraction
+        ? "You can be more expressive since the user is directly engaging with you."
+        : "Keep your response very concise (2-3 sentences max). Be punchy and impactful with your chaos rather than lengthy.";
       
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini-2024-07-18",
@@ -1240,7 +1256,7 @@ class GroupChatBot {
           },
           {
             role: "system",
-            content: `Current chaos level: ${chaosLevel}. Adapt response accordingly while maintaining authenticity.`
+            content: `Current chaos level: ${chaosLevel}. ${conciseInstruction}`
           },
           ...contextMessages,
           ...history.map(msg => ({
@@ -1249,7 +1265,7 @@ class GroupChatBot {
           }))
         ],
         temperature: 1.0, // Maximum creativity for chaos
-        max_tokens: 300,
+        max_tokens: maxTokens,
         presence_penalty: 0.9, // Encourage more unique responses
         frequency_penalty: 0.9 // Discourage repetition
       });
@@ -1411,7 +1427,7 @@ class GroupChatBot {
         if (catalogs?.length) {
           response += `🎵 RELEASES SHEEESH (${catalogs.length} TRACKS)! 💀\n`;
           catalogs.slice(0, 5).forEach(track => {
-            response += `- ${track.title} DROPPED ON ${track.release_date || ''} and its ${track.duration || ''} of PURE HEAT! ��\n`;
+            response += `- ${track.title} DROPPED ON ${track.release_date || ''} and its ${track.duration || ''} of PURE HEAT! 🔥\n`;
           });
           if (catalogs.length > 5) response += `NAH FR we got ${catalogs.length - 5} MORE TRACKS but my brain cant handle it rn fr fr\n`;
           response += '\n';
@@ -1420,7 +1436,7 @@ class GroupChatBot {
         if (shows?.length) {
           response += `🎪 SHOWS LESGOOO (${shows.length})! 🤪\n`;
           shows.slice(0, 3).forEach(show => {
-            response += `- ${show.title} at ${show.venue} on ${show.date} ITS GONNA BE CRAZY! ��\n`;
+            response += `- ${show.title} at ${show.venue} on ${show.date} ITS GONNA BE CRAZY! 🔥\n`;
           });
           if (shows.length > 3) response += `BROO we got ${shows.length - 3} MORE SHOWS but im too hyped rn fr fr\n`;
           response += '\n';
@@ -1612,7 +1628,7 @@ class GroupChatBot {
       "Demo semua! Time to recharge fr fr! 😴",
       "Day's been real, time to reset! ✨",
       "Alhamdulillah for today's W's! 🌙",
-      "Closing time check! Rest up gang! ��"
+      "Closing time check! Rest up gang! 🌙"
     ];
 
     const greeting = modernNightGreetings[Math.floor(Math.random() * modernNightGreetings.length)];
