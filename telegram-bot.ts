@@ -1297,7 +1297,7 @@ class GroupChatBot {
 
   private async setupMorningGreeting() {
     // Schedule job for 8 AM Malaysia time (UTC+8)
-    scheduleJob('0 8 * * *', async () => {
+    scheduleJob({ rule: '0 8 * * *', tz: 'Asia/Kuala_Lumpur' }, async () => {
       try {
         console.log('Sending morning greeting...');
         const quote = await this.generateDailyQuote('morning');
@@ -1318,6 +1318,7 @@ class GroupChatBot {
         console.error('Error in morning greeting scheduler:', error);
       }
     });
+    console.log('Morning greeting scheduler set up for 8 AM MYT');
   }
 
   private formatMorningGreeting(quote: Quote): string {
@@ -1336,7 +1337,7 @@ class GroupChatBot {
 
   private async setupNightGreeting() {
     // Schedule job for 11 PM Malaysia time (UTC+8)
-    scheduleJob('0 23 * * *', async () => {
+    scheduleJob({ rule: '0 23 * * *', tz: 'Asia/Kuala_Lumpur' }, async () => {
       try {
         console.log('Sending night greeting...');
         const quote = await this.generateDailyQuote('night');
@@ -1357,6 +1358,7 @@ class GroupChatBot {
         console.error('Error in night greeting scheduler:', error);
       }
     });
+    console.log('Night greeting scheduler set up for 11 PM MYT');
   }
 
   private formatNightGreeting(quote: Quote): string {
