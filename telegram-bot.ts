@@ -482,7 +482,7 @@ class CatalogAgent {
                 const { data: containsMatches, error: containsError } = await this.supabase
                     .from('catalogs')
                     .select('*')
-                    .or(queries.map(q => `artist::text ilike '%${q}%'`).join(','))
+                    .or(queries.map(q => `artist.ilike.%${q}%`).join(','))
                     .order('release_date', { ascending: false });
 
                 if (containsError) {
@@ -559,7 +559,7 @@ class ShowsAgent {
                 const { data: containsMatches, error: containsError } = await this.supabase
                     .from('shows')
                     .select('*')
-                    .or(queries.map(q => `artists::text ilike '%${q}%'`).join(','))
+                    .or(queries.map(q => `artists.ilike.%${q}%`).join(','))
                     .order('date', { ascending: false });
 
                 if (containsError) {
@@ -636,7 +636,7 @@ class ProjectsAgent {
                 const { data: containsMatches, error: containsError } = await this.supabase
                     .from('projects')
                     .select('*')
-                    .or(queries.map(q => `collaborators::text ilike '%${q}%'`).join(','))
+                    .or(queries.map(q => `collaborators.ilike.%${q}%`).join(','))
                     .order('created_at', { ascending: false });
 
                 if (containsError) {
@@ -651,7 +651,7 @@ class ProjectsAgent {
             const { data: trackMatches, error: trackError } = await this.supabase
                 .from('projects')
                 .select('*')
-                .or(queries.map(q => `tracks::jsonb->>'features' ilike '%${q}%'`).join(','))
+                .or(queries.map(q => `tracks->features.cs.{${q}}`).join(','))
                 .order('created_at', { ascending: false });
 
             if (trackError) {
