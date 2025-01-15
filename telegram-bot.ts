@@ -4,6 +4,7 @@ import { config } from 'dotenv';
 import * as http from 'http';
 import { createClient } from '@supabase/supabase-js';
 import { scheduleJob } from 'node-schedule';
+import { slatanKnowledgeBase, type ArtistInfo } from './slatan-data';
 
 // Load environment variables
 config();
@@ -1231,20 +1232,22 @@ class GroupChatBot {
     const messageTextLower = messageText.toLowerCase();
     const isNameMention = messageTextLower.includes('amat');
     
-    // Check for artist search request
-    const searchMatch = messageTextLower.match(/(?:search|cari|tengok|check)\s+(?:lagu|song|track|music)?\s*(\w+)/i);
-    if (searchMatch) {
-        const artistName = searchMatch[1];
-        console.log('Artist search request detected for:', artistName);
+    // Check for SLATAN artist search request
+    const artistMatch = messageTextLower.match(/(?:about|who|what|tell|info|songs?|tracks?|catalog|music|lagu|dengar|check|tengok|cari)\s+(?:by|from|about|untuk|oleh|daripada)?\s*([a-zA-Z0-9\s_]+)(?:\s+ke)?$/i);
+    
+    if (artistMatch) {
+        const artistName = artistMatch[1].trim();
+        console.log('Artist inquiry detected for:', artistName);
         try {
-            const response = await this.handleArtistInquiry(artistName);
+            // First try SLATAN knowledge base, then fall back to Supabase
+            const response = await this.handleSlatanArtistInquiry(artistName);
             await ctx.reply(response, {
                 reply_to_message_id: ctx.message.message_id,
                 disable_web_page_preview: true
             } as any);
             return;
         } catch (error) {
-            console.error('Error handling artist search:', error);
+            console.error('Error handling artist inquiry:', error);
             await ctx.reply('Alamak error la pulak! 😅 Try again later k bestie?', {
                 reply_to_message_id: ctx.message.message_id
             });
@@ -2204,6 +2207,109 @@ class GroupChatBot {
     }
     
     return "Baseline chaos";
+  }
+
+  private async handleSlatanArtistInquiry(query: string): Promise<string> {
+    try {
+      // Clean and normalize the query
+      const normalizedQuery = query.toLowerCase().trim();
+      console.log('Searching for SLATAN artist:', normalizedQuery);
+
+      // First check if it's about SLATAN collective itself
+      if (normalizedQuery.includes('slatan') || normalizedQuery.includes('0108')) {
+        const info = slatanKnowledgeBase.collective;
+        return `YO GANG! Let me tell you about ${info.name}! 🔥\n\n` +
+               `${info.description}\n\n` +
+               `Founded: ${info.founded}\n` +
+               `Base: ${info.base}\n\n` +
+               `Facts:\n${info.facts.map(f => `• ${f}`).join('\n')}\n\n` +
+               `Follow us:\n` +
+               `IG: ${info.socials.instagram}\n` +
+               `Twitter: ${info.socials.twitter}\n\n` +
+               `SUPPORT LOCAL SCENE FR FR! 💯🔥`;
+      }
+
+      // Search for artist in knowledge base
+      const artist = Object.values(slatanKnowledgeBase.artists).find((a: ArtistInfo) => 
+        a.name.toLowerCase().includes(normalizedQuery) || 
+        a.aliases?.some((alias: string) => alias.toLowerCase().includes(normalizedQuery))
+      );
+
+      if (artist) {
+        let response = `YO CHECK OUT ${artist.name} FR FR! 🔥\n\n`;
+        response += `${artist.bio}\n\n`;
+        
+        if (artist.role.length > 0) {
+          response += `Roles: ${artist.role.join(', ')}\n`;
+        }
+        
+        if (artist.genres.length > 0) {
+          response += `Genres: ${artist.genres.join(', ')}\n`;
+        }
+        
+        if (artist.notableWorks && artist.notableWorks.length > 0) {
+          response += `\nNotable Works:\n${artist.notableWorks.map((w: string) => `• ${w}`).join('\n')}\n`;
+        }
+        
+        response += `\nFacts:\n${artist.facts.map(f => `• ${f}`).join('\n')}\n`;
+        
+        response += '\nSocials:\n';
+        Object.entries(artist.socials).forEach(([platform, handle]) => {
+          response += `${platform.charAt(0).toUpperCase() + platform.slice(1)}: ${handle}\n`;
+        });
+        
+        response += '\nSUPPORT LOCAL ARTISTS FR FR! 🔥';
+        
+        return response;
+      }
+
+      // If no match in knowledge base, try Supabase
+      const supabaseInfo = await this.searchArtistInfo(query);
+      if (supabaseInfo.catalogs.length || supabaseInfo.shows.length || supabaseInfo.projects.length) {
+        return this.formatArtistResponse(query, supabaseInfo);
+      }
+
+      return `Eh bestie, mbo tak jumpa info about "${query}" dalam database 😅 But you can always check @lebuhrayaselatan on IG for updates! 💯`;
+
+    } catch (error) {
+      console.error('Error in SLATAN artist inquiry:', error);
+      return 'Alamak error la pulak! 😅 Try again later k bestie?';
+    }
+  }
+
+  private formatArtistResponse(query: string, info: any): string {
+    let response = `YO GANG! Here's what I found about ${query}! 🔥\n\n`;
+
+    if (info.catalogs?.length > 0) {
+      response += '🎵 RELEASES:\n';
+      info.catalogs.slice(0, 5).forEach((track: any) => {
+        response += `• ${track.title} (${track.language})\n`;
+        if (track.link) response += `  Listen here: ${track.link}\n`;
+      });
+      if (info.catalogs.length > 5) {
+        response += `+ ${info.catalogs.length - 5} more tracks! 🔥\n`;
+      }
+      response += '\n';
+    }
+
+    if (info.shows?.length > 0) {
+      response += '🎪 UPCOMING SHOWS:\n';
+      info.shows.forEach((show: any) => {
+        response += `• ${show.title} at ${show.venue}\n`;
+        if (show.ticket_link) response += `  Get tickets: ${show.ticket_link}\n`;
+      });
+      response += '\n';
+    }
+
+    if (info.projects?.length > 0) {
+      response += '🎹 PROJECTS:\n';
+      info.projects.forEach((project: any) => {
+        response += `• ${project.title} (${project.status.toLowerCase()})\n`;
+      });
+    }
+
+    response += '\nFOLLOW @lebuhrayaselatan ON IG FOR MORE UPDATES! 🔥';
+    return response;
   }
 }
 
