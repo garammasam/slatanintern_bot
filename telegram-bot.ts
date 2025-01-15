@@ -1440,22 +1440,22 @@ class GroupChatBot {
       // Normalize the artist query for case-insensitive search
       const normalizedQuery = artistQuery.toLowerCase().trim();
       
-      // Search catalogs - using case-insensitive array containment
+      // Search catalogs - using array contains for artist array
       const { data: catalogs, error: catalogError } = await supabase
         .from('catalogs')
         .select('*')
-        .filter('artist', 'ilike', `%${normalizedQuery}%`)  // Changed to case-insensitive pattern match
+        .contains('artist', [normalizedQuery])
         .order('release_date', { ascending: false });
 
       if (catalogError) {
         console.error('Error searching catalogs:', catalogError);
       }
 
-      // Search shows - using case-insensitive array containment
+      // Search shows - using array contains for artists array
       const { data: shows, error: showError } = await supabase
         .from('shows')
         .select('*')
-        .filter('artists', 'ilike', `%${normalizedQuery}%`)  // Changed to case-insensitive pattern match
+        .contains('artists', [normalizedQuery])
         .eq('status', 'upcoming')
         .order('date', { ascending: true });
 
@@ -1463,16 +1463,17 @@ class GroupChatBot {
         console.error('Error searching shows:', showError);
       }
 
-      // Search projects - using both direct artist match and collaborators array
+      // Search projects - check main artist, collaborators, and track features
       const { data: projectsArtist, error: projectError1 } = await supabase
         .from('projects')
         .select('*')
-        .ilike('artist', `%${normalizedQuery}%`);
+        .or(`artist.ilike.%${normalizedQuery}%,collaborators.cs.{${normalizedQuery}}`);
 
-      const { data: projectsCollab, error: projectError2 } = await supabase
+      // Search for artist in track features
+      const { data: projectsFeatures, error: projectError2 } = await supabase
         .from('projects')
         .select('*')
-        .filter('collaborators', 'ilike', `%${normalizedQuery}%`);  // Changed to case-insensitive pattern match
+        .contains('tracks', [{ features: [normalizedQuery] }]);
 
       if (projectError1 || projectError2) {
         console.error('Error searching projects:', projectError1 || projectError2);
@@ -1484,7 +1485,8 @@ class GroupChatBot {
       }
 
       // Combine and deduplicate projects
-      const projects = [...new Set([...(projectsArtist || []), ...(projectsCollab || [])])];
+      const allProjects = [...(projectsArtist || []), ...(projectsFeatures || [])];
+      const projects = [...new Set(allProjects.map(p => JSON.stringify(p)))].map(p => JSON.parse(p));
 
       console.log(`Found catalogs: ${catalogs?.length || 0}`);
       console.log(`Found shows: ${shows?.length || 0}`);
