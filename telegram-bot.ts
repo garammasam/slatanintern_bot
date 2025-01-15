@@ -447,56 +447,42 @@ class CatalogAgent {
 
     async searchArtist(query: string): Promise<DatabaseCatalogTrack[]> {
         try {
-            const normalizedQuery = query.toLowerCase().trim();
-            console.log('CatalogAgent searching for:', normalizedQuery);
+            console.log('CatalogAgent searching for:', query);
+            const queries = query.toLowerCase().split(/[\s,]+/);
 
-            // Try all case variations
-            const queries = [
-                normalizedQuery,                    // lowercase
-                normalizedQuery.toUpperCase(),      // uppercase
-                normalizedQuery.charAt(0).toUpperCase() + normalizedQuery.slice(1)  // capitalized
-            ];
+            // Try exact match first
+            const { data: exactMatches, error } = await this.supabase
+                .from('catalogs')
+                .select('*')
+                .filter('artist', 'cs', `{${query}}`)
+                .order('release_date', { ascending: false });
 
-            let allMatches: DatabaseCatalogTrack[] = [];
-            
-            // Try each case variation
-            for (const q of queries) {
-                const { data: matches, error } = await this.supabase
-                    .from('catalogs')
-                    .select('*')
-                    .filter('artist', 'cs', `{"${q}"}`)
-                    .order('release_date', { ascending: false });
-
-                if (error) {
-                    console.error(`CatalogAgent search error for "${q}":`, error);
-                    continue;
-                }
-
-                if (matches?.length) {
-                    console.log(`Found ${matches.length} matches for "${q}"`);
-                    allMatches = [...allMatches, ...matches];
-                }
+            if (error) {
+                console.error('CatalogAgent exact match error:', error);
+                return [];
             }
 
-            // If no exact matches found, try partial match
+            let allMatches: DatabaseCatalogTrack[] = exactMatches || [];
+
+            // If no exact matches found, try case-insensitive search
             if (!allMatches.length) {
-                console.log('No exact matches, trying partial match');
-                const { data: partialMatches, error: partialError } = await this.supabase
+                console.log('No exact matches, trying case-insensitive search');
+                const { data: fuzzyMatches, error: fuzzyError } = await this.supabase
                     .from('catalogs')
                     .select('*')
-                    .or(queries.map(q => `artist.cs.{"${q}%"}`).join(','))
+                    .or(queries.map(q => `artist.ilike.%${q}%`).join(','))
                     .order('release_date', { ascending: false });
 
-                if (partialError) {
-                    console.error('CatalogAgent partial match error:', partialError);
-                } else if (partialMatches?.length) {
-                    console.log(`Found ${partialMatches.length} partial matches`);
-                    allMatches = partialMatches;
+                if (fuzzyError) {
+                    console.error('CatalogAgent fuzzy search error:', fuzzyError);
+                } else if (fuzzyMatches?.length) {
+                    console.log(`Found ${fuzzyMatches.length} fuzzy matches`);
+                    allMatches = fuzzyMatches as DatabaseCatalogTrack[];
                 }
             }
 
             // Remove duplicates
-            const uniqueMatches = Array.from(new Map(allMatches.map(item => [item.id, item])).values());
+            const uniqueMatches = Array.from(new Map(allMatches.map((item: DatabaseCatalogTrack) => [item.id, item])).values());
             console.log(`Returning ${uniqueMatches.length} unique matches`);
             return uniqueMatches;
 
@@ -526,23 +512,37 @@ class ShowsAgent {
 
     async searchArtist(query: string): Promise<DatabaseShow[]> {
         try {
-            const normalizedQuery = query.toLowerCase().trim();
-            console.log('ShowsAgent searching for:', normalizedQuery);
+            console.log('ShowsAgent searching for:', query);
+            const queries = query.toLowerCase().split(/[\s,]+/);
 
-            const { data, error } = await this.supabase
+            const { data: shows, error } = await this.supabase
                 .from('shows')
                 .select('*')
-                .filter('artists', 'cs', `{"${normalizedQuery}"}`)
-                .eq('status', 'upcoming')
-                .order('date', { ascending: true });
+                .filter('artists', 'cs', `{${query}}`)
+                .order('date', { ascending: false });
 
             if (error) {
-                console.error('ShowsAgent search error:', error);
+                console.error('ShowsAgent error:', error);
                 return [];
             }
 
-            console.log('ShowsAgent found:', data?.length || 0, 'entries');
-            return data || [];
+            // Try case-insensitive search if no results
+            if (!shows?.length) {
+                const { data: fuzzyShows, error: fuzzyError } = await this.supabase
+                    .from('shows')
+                    .select('*')
+                    .or(queries.map(q => `artists.ilike.%${q}%`).join(','))
+                    .order('date', { ascending: false });
+
+                if (fuzzyError) {
+                    console.error('ShowsAgent fuzzy search error:', fuzzyError);
+                    return [];
+                }
+
+                return fuzzyShows || [];
+            }
+
+            return shows;
         } catch (error) {
             console.error('ShowsAgent error:', error);
             return [];
@@ -569,22 +569,59 @@ class ProjectsAgent {
 
     async searchArtist(query: string): Promise<DatabaseProject[]> {
         try {
-            const normalizedQuery = query.toLowerCase().trim();
-            console.log('ProjectsAgent searching for:', normalizedQuery);
+            console.log('ProjectsAgent searching for:', query);
+            const queries = query.toLowerCase().split(/[\s,]+/);
 
-            const { data, error } = await this.supabase
+            // Try exact match first
+            const { data: exactMatches, error } = await this.supabase
                 .from('projects')
                 .select('*')
-                .or(`artist.ilike.%${normalizedQuery}%,collaborators.cs.{"${normalizedQuery}"}`)
-                .order('deadline', { ascending: true });
+                .filter('collaborators', 'cs', `{${query}}`)
+                .order('created_at', { ascending: false });
 
             if (error) {
-                console.error('ProjectsAgent search error:', error);
+                console.error('ProjectsAgent exact match error:', error);
                 return [];
             }
 
-            console.log('ProjectsAgent found:', data?.length || 0, 'entries');
-            return data || [];
+            let allMatches: DatabaseProject[] = exactMatches || [];
+
+            // If no exact matches found, try case-insensitive search
+            if (!allMatches.length) {
+                console.log('No exact matches, trying case-insensitive search');
+                const { data: fuzzyMatches, error: fuzzyError } = await this.supabase
+                    .from('projects')
+                    .select('*')
+                    .or(queries.map(q => `collaborators.ilike.%${q}%`).join(','))
+                    .order('created_at', { ascending: false });
+
+                if (fuzzyError) {
+                    console.error('ProjectsAgent fuzzy search error:', fuzzyError);
+                } else if (fuzzyMatches?.length) {
+                    console.log(`Found ${fuzzyMatches.length} fuzzy matches`);
+                    allMatches = fuzzyMatches as DatabaseProject[];
+                }
+            }
+
+            // Also search in track features
+            const { data: trackMatches, error: trackError } = await this.supabase
+                .from('projects')
+                .select('*')
+                .or(queries.map(q => `tracks->features.cs.{${q}}`).join(','))
+                .order('created_at', { ascending: false });
+
+            if (trackError) {
+                console.error('ProjectsAgent track search error:', trackError);
+            } else if (trackMatches?.length) {
+                console.log(`Found ${trackMatches.length} track matches`);
+                allMatches = [...allMatches, ...(trackMatches as DatabaseProject[])];
+            }
+
+            // Remove duplicates
+            const uniqueMatches = Array.from(new Map(allMatches.map((item: DatabaseProject) => [item.id, item])).values());
+            console.log(`Returning ${uniqueMatches.length} unique matches`);
+            return uniqueMatches;
+
         } catch (error) {
             console.error('ProjectsAgent error:', error);
             return [];
