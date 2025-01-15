@@ -467,7 +467,7 @@ class CatalogAgent {
                 const { data: partialMatches, error: partialError } = await this.supabase
                     .from('catalogs')
                     .select('*')
-                    .or(`artist.ilike.%${normalizedQuery}%,artist.cs.{"${normalizedQuery}"}`)
+                    .filter('artist', 'cs', `{"%${normalizedQuery}%"}`)
                     .order('release_date', { ascending: false });
 
                 if (partialError) {
