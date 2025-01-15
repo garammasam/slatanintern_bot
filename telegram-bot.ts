@@ -216,8 +216,47 @@ const contextFramework: ContextFramework = {
   }
 };
 
-// Enhanced slang database with more modern Malaysian references
+// Enhanced slang database with more modern Malaysian references and self-awareness responses
 const updatedSlangDB: SlangDatabase = {
+  'diam': {
+    word: 'diam',
+    meaning: 'be quiet/shut up',
+    context: 'When someone wants the bot to be quiet',
+    category: 'criticism',
+    examples: ['diam la', 'diam pls', 'diam kejap', 'diam diam'],
+    responses: [
+      'Ok ok mbo diam 🤐',
+      'Yelah, mbo quiet je lepas ni 🤫',
+      'Sori2, mbo diam skrg 🙏',
+      'Fine, mbo shut up la 😶'
+    ]
+  },
+  'berisik': {
+    word: 'berisik',
+    meaning: 'noisy/too talkative',
+    context: 'When someone thinks the bot is being too noisy',
+    category: 'criticism',
+    examples: ['berisik la', 'bising', 'berisik gile', 'bising la'],
+    responses: [
+      'Ok ok mbo kurangkan berisik sikit 🤫',
+      'Sori2 kalau mbo terlalu hyper 😅',
+      'Yelah, mbo tone down sikit 🙏',
+      'Fine fine, mbo chill sikit 😶'
+    ]
+  },
+  'cerewet': {
+    word: 'cerewet',
+    meaning: 'fussy/annoying',
+    context: 'When someone finds the bot annoying',
+    category: 'criticism',
+    examples: ['cerewet', 'cerewet la', 'cerewet gile'],
+    responses: [
+      'Eh sori2 kalau mbo cerewet sangat 😅',
+      'Ok ok mbo tak cerewet dah lepas ni 🙏',
+      'Yelah, mbo chill sikit 🤫',
+      'Fine, mbo kurangkan cerewet level 😶'
+    ]
+  },
   'triggered': {
     word: 'triggered',
     meaning: 'easily offended/upset',
@@ -471,6 +510,9 @@ class GroupChatBot {
       ]
     }
   };
+  
+  private selfAwarenessCooldowns: Map<string, number> = new Map();
+  private readonly SELF_AWARENESS_COOLDOWN = 180000; // 3 minutes cooldown
   
   constructor(config: BotConfig) {
     this.bot = new Bot(config.telegramToken);
@@ -861,7 +903,7 @@ class GroupChatBot {
   }
   
   private async handleDirectMention(ctx: Context) {
-    this.lastActivityTime = new Date(); // Update activity timestamp
+    this.lastActivityTime = new Date();
     console.log('Processing direct mention...');
     const groupId = ctx.chat?.id.toString();
     const messageText = ctx.message?.text;
@@ -873,6 +915,38 @@ class GroupChatBot {
 
     const messageTextLower = messageText.toLowerCase();
     
+    // Check for self-awareness triggers first
+    for (const [key, slang] of Object.entries(this.slangDB)) {
+      if (slang.category === 'criticism') {
+        // Check if in cooldown
+        const lastResponse = this.selfAwarenessCooldowns.get(groupId);
+        const now = Date.now();
+        
+        if (lastResponse && now - lastResponse < this.SELF_AWARENESS_COOLDOWN) {
+          // Generate dynamic cynical response
+          const response = await this.generateCynicalResponse(key);
+          await ctx.reply(response, {
+            reply_to_message_id: ctx.message.message_id,
+            disable_web_page_preview: true
+          } as any);
+          return;
+        }
+
+        // Check exact matches or example phrases
+        if (messageTextLower.includes(key) || slang.examples.some(ex => messageTextLower.includes(ex))) {
+          console.log('Self-awareness trigger detected:', key);
+          // Set cooldown
+          this.selfAwarenessCooldowns.set(groupId, now);
+          const response = slang.responses[Math.floor(Math.random() * slang.responses.length)];
+          await ctx.reply(response, {
+            reply_to_message_id: ctx.message.message_id,
+            disable_web_page_preview: true
+          } as any);
+          return;
+        }
+      }
+    }
+
     // Check for merchandise inquiries first
     if (messageTextLower.includes('slatan') || messageTextLower.includes('0108')) {
       if (this.merchKeywords.regex.test(messageTextLower)) {
@@ -1566,7 +1640,7 @@ class GroupChatBot {
       try {
         console.log('Sending morning greeting...');
         const quote = await this.generateDailyQuote('morning');
-        const greeting = this.formatMorningGreeting(quote);
+        const greeting = await this.generateGreeting('morning');
 
         // Send to all configured groups
         for (const groupId of this.config.groupIds) {
@@ -1586,27 +1660,13 @@ class GroupChatBot {
     console.log('Morning greeting scheduler set up for 8 AM MYT');
   }
 
-  private formatMorningGreeting(quote: Quote): string {
-    const modernGreetings = [
-      "Assalamualaikum everyone! Rise and shine! 🌞",
-      "Morning check! Time to secure the bag! ⭐️",
-      "Yo demo! Let's get this bread! 🌞🌞",
-      "Good morning gang! Time to level up! 🌄",
-      "Rise and grind fr fr! 🌅",
-      "Another day to slay! Let's go! ⭐️"
-    ];
-
-    const greeting = modernGreetings[Math.floor(Math.random() * modernGreetings.length)];
-    return `${greeting}\n\nQuote of the day:\n\n"${this.escapeMarkdown(quote.text)}"\n- ${this.escapeMarkdown(quote.author)}\n\nLet's make today count! 💪 No cap, we going crazy! 🔥`;
-  }
-
   private async setupNightGreeting() {
     // Schedule job for 11 PM Malaysia time (UTC+8)
     scheduleJob({ rule: '0 23 * * *', tz: 'Asia/Kuala_Lumpur' }, async () => {
       try {
         console.log('Sending night greeting...');
         const quote = await this.generateDailyQuote('night');
-        const greeting = this.formatNightGreeting(quote);
+        const greeting = await this.generateGreeting('night');
 
         // Send to all configured groups
         for (const groupId of this.config.groupIds) {
@@ -1626,17 +1686,60 @@ class GroupChatBot {
     console.log('Night greeting scheduler set up for 11 PM MYT');
   }
 
-  private formatNightGreeting(quote: Quote): string {
-    const modernNightGreetings = [
-      "Assalamualaikum! Time to wrap up the day! 🌙",
-      "Aight gang, let's call it a day! 💤",
-      "Demo semua! Time to recharge fr fr! 😴",
-      "Day's been real, time to reset! ✨",
-      "Alhamdulillah for today's W's! 🌙",
-      "Closing time check! Rest up gang! 🌙"
-    ];
+  private async generateCynicalResponse(trigger: string): Promise<string> {
+    try {
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini-2024-07-18",
+        messages: [
+          {
+            role: "system",
+            content: `You are a sarcastic Malaysian bot who's been told to be quiet multiple times. Generate a single short cynical response in Malaysian slang (mix of Malay and English) about how you're already being quiet. Use emojis. Reference that you've already been told "${trigger}". Keep it under 10 words. Be passive-aggressive but funny.`
+          }
+        ],
+        temperature: 1.0,
+        max_tokens: 60,
+        presence_penalty: 0.9,
+        frequency_penalty: 0.9
+      });
+      
+      return completion.choices[0].message.content || 'yelah tu, mbo diam je la 🙄';
+    } catch (error) {
+      console.error('Error generating cynical response:', error);
+      return 'yelah tu, mbo diam je la 🙄';
+    }
+  }
 
-    const greeting = modernNightGreetings[Math.floor(Math.random() * modernNightGreetings.length)];
+  private async generateGreeting(type: 'morning' | 'night'): Promise<string> {
+    try {
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini-2024-07-18",
+        messages: [
+          {
+            role: "system",
+            content: `Generate a creative Malaysian ${type} greeting in SLATAN's chaotic style. Mix Malay and English naturally. Include emojis. Keep it under 20 words. Make it feel fresh and not repetitive. For ${type === 'morning' ? 'starting the day energetically' : 'winding down and resting'}.`
+          }
+        ],
+        temperature: 1.0,
+        max_tokens: 60,
+        presence_penalty: 0.9,
+        frequency_penalty: 0.9
+      });
+      
+      return completion.choices[0].message.content || 
+        (type === 'morning' ? 'Assalamualaikum everyone! Rise and shine! 🌞' : 'Assalamualaikum! Time to wrap up the day! 🌙');
+    } catch (error) {
+      console.error(`Error generating ${type} greeting:`, error);
+      return type === 'morning' ? 'Assalamualaikum everyone! Rise and shine! 🌞' : 'Assalamualaikum! Time to wrap up the day! 🌙';
+    }
+  }
+
+  private async formatMorningGreeting(quote: Quote): Promise<string> {
+    const greeting = await this.generateGreeting('morning');
+    return `${greeting}\n\nQuote of the day:\n\n"${this.escapeMarkdown(quote.text)}"\n- ${this.escapeMarkdown(quote.author)}\n\nLet's make today count! 💪 No cap, we going crazy! 🔥`;
+  }
+
+  private async formatNightGreeting(quote: Quote): Promise<string> {
+    const greeting = await this.generateGreeting('night');
     return `${greeting}\n\nNight thoughts:\n\n"${this.escapeMarkdown(quote.text)}"\n- ${this.escapeMarkdown(quote.author)}\n\nGet that rest fr fr! 💫 Tomorrow we go again! 🔥`;
   }
 
