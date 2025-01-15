@@ -1473,18 +1473,18 @@ class GroupChatBot {
 
         // Parallel queries for better performance
         const [catalogsResult, showsResult, projectsResult] = await Promise.all([
-            // Search catalogs with case-insensitive array contains
+            // Search catalogs - using ilike for case-insensitive search within array
             supabase
                 .from('catalogs')
                 .select('*')
-                .filter('artist', 'cs', `{${normalizedQuery}}`)
+                .filter('artist', 'cs', `{"${normalizedQuery}"}`)
                 .order('release_date', { ascending: false }),
 
-            // Search shows with case-insensitive array contains
+            // Search shows - using ilike for case-insensitive search within array
             supabase
                 .from('shows')
                 .select('*')
-                .filter('artists', 'cs', `{${normalizedQuery}}`)
+                .filter('artists', 'cs', `{"${normalizedQuery}"}`)
                 .eq('status', 'upcoming')
                 .order('date', { ascending: true }),
 
@@ -1492,25 +1492,19 @@ class GroupChatBot {
             supabase
                 .from('projects')
                 .select('*')
-                .or(`artist.ilike.%${normalizedQuery}%,collaborators.cs.{${normalizedQuery}}`)
+                .or(`artist.ilike.%${normalizedQuery}%,collaborators.cs.{"${normalizedQuery}"}`)
                 .order('deadline', { ascending: true })
         ]);
 
-        // Handle any errors
-        if (catalogsResult.error) {
-            console.error('Error searching catalogs:', catalogsResult.error);
-        }
-        if (showsResult.error) {
-            console.error('Error searching shows:', showsResult.error);
-        }
-        if (projectsResult.error) {
-            console.error('Error searching projects:', projectsResult.error);
-        }
-
         // Log results for debugging
-        console.log(`Found catalogs: ${catalogsResult.data?.length || 0}`);
-        console.log(`Found shows: ${showsResult.data?.length || 0}`);
-        console.log(`Found projects: ${projectsResult.data?.length || 0}`);
+        console.log('Catalog search results:', catalogsResult.data?.length || 0);
+        if (catalogsResult.error) console.error('Catalog search error:', catalogsResult.error);
+
+        console.log('Shows search results:', showsResult.data?.length || 0);
+        if (showsResult.error) console.error('Shows search error:', showsResult.error);
+
+        console.log('Projects search results:', projectsResult.data?.length || 0);
+        if (projectsResult.error) console.error('Projects search error:', projectsResult.error);
 
         return {
             catalogs: catalogsResult.data || [],
