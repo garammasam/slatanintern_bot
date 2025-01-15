@@ -868,11 +868,16 @@ class GroupChatBot {
   }
   
   private async handleGroupMessage(ctx: Context) {
-    this.lastActivityTime = new Date(); // Update activity timestamp
+    this.lastActivityTime = new Date();
     const groupId = ctx.chat?.id.toString();
     const messageText = ctx.message?.text;
     
     if (!groupId || !messageText) return;
+    
+    const messageTextLower = messageText.toLowerCase();
+    const isNameMention = messageTextLower.includes('amat');
+    const isBotMention = ctx.message?.text?.includes('@' + ctx.me.username);
+    const isReplyToBot = ctx.message?.reply_to_message?.from?.id === ctx.me.id;
     
     // Update conversation history
     this.updateMessageHistory(groupId, {
@@ -882,20 +887,27 @@ class GroupChatBot {
     });
     
     try {
-      const response = await this.generateResponse(groupId);
-      if (response) {
-        // Add some human-like delay
-        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-        await ctx.reply(response, {
-          disable_web_page_preview: true
-        } as any);
-        
-        // Update history with bot's response
-        this.updateMessageHistory(groupId, {
-          role: 'assistant',
-          content: response,
-          timestamp: Date.now()
-        });
+      // Always respond to name mentions, bot mentions, and direct replies
+      if (isNameMention || isBotMention || isReplyToBot) {
+        console.log('Name mention or direct interaction detected, handling response...');
+        await this.handleDirectMention(ctx);
+      } else if (this.shouldRespond(ctx)) {
+        console.log('Random response triggered, handling group message...');
+        const response = await this.generateResponse(groupId);
+        if (response) {
+          // Add some human-like delay
+          await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+          await ctx.reply(response, {
+            disable_web_page_preview: true
+          } as any);
+          
+          // Update history with bot's response
+          this.updateMessageHistory(groupId, {
+            role: 'assistant',
+            content: response,
+            timestamp: Date.now()
+          });
+        }
       }
     } catch (error) {
       console.error('Error generating response:', error);
@@ -904,7 +916,7 @@ class GroupChatBot {
   
   private async handleDirectMention(ctx: Context) {
     this.lastActivityTime = new Date();
-    console.log('Processing direct mention...');
+    console.log('Processing direct mention or name reference...');
     const groupId = ctx.chat?.id.toString();
     const messageText = ctx.message?.text;
     
@@ -914,7 +926,41 @@ class GroupChatBot {
     }
 
     const messageTextLower = messageText.toLowerCase();
+    const isNameMention = messageTextLower.includes('amat');
     
+    // If it's a name mention without direct command/question, generate a casual response
+    if (isNameMention && !messageTextLower.includes('@' + ctx.me.username?.toLowerCase())) {
+      try {
+        const completion = await this.openai.chat.completions.create({
+          model: "gpt-4o-mini-2024-07-18",
+          messages: [
+            {
+              role: "system",
+              content: `You are Amat, a chaotic Malaysian bot. Someone just mentioned your name. Generate a short, witty response in Malaysian slang (mix of Malay and English). Keep it under 15 words. Be playful and slightly chaotic. Use emojis. Reference the fact they mentioned your name.`
+            },
+            {
+              role: "user",
+              content: messageText
+            }
+          ],
+          temperature: 1.0,
+          max_tokens: 60,
+          presence_penalty: 0.9,
+          frequency_penalty: 0.9
+        });
+        
+        const response = completion.choices[0].message.content || 'Eh ada org sebut nama mbo ke? 👀';
+        await ctx.reply(response, {
+          reply_to_message_id: ctx.message.message_id,
+          disable_web_page_preview: true
+        } as any);
+        return;
+      } catch (error) {
+        console.error('Error generating name mention response:', error);
+      }
+    }
+    
+    // Continue with existing mention handling logic
     // Check for self-awareness triggers first
     for (const [key, slang] of Object.entries(this.slangDB)) {
       if (slang.category === 'criticism') {
