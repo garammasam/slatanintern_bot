@@ -1201,7 +1201,8 @@ class GroupChatBot {
         if (response) {
           // Add some human-like delay
           await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-          await ctx.reply(response, {
+          await ctx.reply(this.formatResponseForTelegram(response), {
+            parse_mode: 'HTML',
             disable_web_page_preview: true
           } as any);
           
@@ -1241,16 +1242,17 @@ class GroupChatBot {
         try {
             // First try SLATAN knowledge base, then fall back to Supabase
             const response = await this.handleSlatanArtistInquiry(artistName);
-            await ctx.reply(response, {
-                reply_to_message_id: ctx.message.message_id,
-                disable_web_page_preview: true
+            await ctx.reply(this.formatResponseForTelegram(response), {
+                parse_mode: 'HTML',
+                disable_web_page_preview: true,
+                reply_to_message_id: ctx.message.message_id
             } as any);
             return;
         } catch (error) {
             console.error('Error handling artist inquiry:', error);
             await ctx.reply('Alamak error la pulak! 😅 Try again later k bestie?', {
                 reply_to_message_id: ctx.message.message_id
-            });
+            } as any);
             return;
         }
     }
@@ -1277,9 +1279,10 @@ class GroupChatBot {
             });
             
             const response = completion.choices[0].message.content || 'Eh ada org sebut nama mbo ke? 👀';
-            await ctx.reply(response, {
-                reply_to_message_id: ctx.message.message_id,
-                disable_web_page_preview: true
+            await ctx.reply(this.formatResponseForTelegram(response), {
+                parse_mode: 'HTML',
+                disable_web_page_preview: true,
+                reply_to_message_id: ctx.message.message_id
             } as any);
             return;
         } catch (error) {
@@ -1298,9 +1301,10 @@ class GroupChatBot {
             if (lastResponse && now - lastResponse < this.SELF_AWARENESS_COOLDOWN) {
                 // Generate dynamic cynical response
                 const response = await this.generateCynicalResponse(key);
-                await ctx.reply(response, {
-                    reply_to_message_id: ctx.message.message_id,
-                    disable_web_page_preview: true
+                await ctx.reply(this.formatResponseForTelegram(response), {
+                    parse_mode: 'HTML',
+                    disable_web_page_preview: true,
+                    reply_to_message_id: ctx.message.message_id
                 } as any);
                 return;
             }
@@ -1311,9 +1315,10 @@ class GroupChatBot {
                 // Set cooldown
                 this.selfAwarenessCooldowns.set(groupId, now);
                 const response = slang.responses[Math.floor(Math.random() * slang.responses.length)];
-                await ctx.reply(response, {
-                    reply_to_message_id: ctx.message.message_id,
-                    disable_web_page_preview: true
+                await ctx.reply(this.formatResponseForTelegram(response), {
+                    parse_mode: 'HTML',
+                    disable_web_page_preview: true,
+                    reply_to_message_id: ctx.message.message_id
                 } as any);
                 return;
             }
@@ -1334,9 +1339,10 @@ class GroupChatBot {
             // Add some human-like delay
             await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
             console.log('Sending response:', response);
-            await ctx.reply(response, {
-                reply_to_message_id: ctx.message.message_id,
-                disable_web_page_preview: true
+            await ctx.reply(this.formatResponseForTelegram(response), {
+                parse_mode: 'HTML',
+                disable_web_page_preview: true,
+                reply_to_message_id: ctx.message.message_id
             } as any);
             
             // Update history with bot's response
@@ -2218,15 +2224,15 @@ class GroupChatBot {
       // First check if it's about SLATAN collective itself
       if (normalizedQuery.includes('slatan') || normalizedQuery.includes('0108')) {
         const info = slatanKnowledgeBase.collective;
-        return `YO GANG! Let me tell you about ${info.name}! 🔥\n\n` +
+        return `**YO GANG!** Let me tell you about *${info.name}*! 🔥\n\n` +
                `${info.description}\n\n` +
-               `Founded: ${info.founded}\n` +
-               `Base: ${info.base}\n\n` +
-               `Facts:\n${info.facts.map(f => `• ${f}`).join('\n')}\n\n` +
-               `Follow us:\n` +
-               `IG: ${info.socials.instagram}\n` +
-               `Twitter: ${info.socials.twitter}\n\n` +
-               `SUPPORT LOCAL SCENE FR FR! 💯🔥`;
+               `**Founded:** *${info.founded}*\n` +
+               `**Base:** *${info.base}*\n\n` +
+               `**Facts:**\n${info.facts.map(f => `• ${f}`).join('\n')}\n\n` +
+               `**Follow us:**\n` +
+               `**IG:** *${info.socials.instagram}*\n` +
+               `**Twitter:** *${info.socials.twitter}*\n\n` +
+               `**SUPPORT LOCAL SCENE FR FR!** 💯🔥`;
       }
 
       // Search for artist in knowledge base
@@ -2273,43 +2279,77 @@ class GroupChatBot {
 
     } catch (error) {
       console.error('Error in SLATAN artist inquiry:', error);
-      return 'Alamak error la pulak! 😅 Try again later k bestie?';
+      return '*Alamak error la pulak!* 😅 Try again later k bestie?';
     }
   }
 
   private formatArtistResponse(query: string, info: any): string {
-    let response = `YO GANG! Here's what I found about ${query}! 🔥\n\n`;
+    let response = `**YO GANG!** Here's what I found about *${query}*! 🔥\n\n`;
 
     if (info.catalogs?.length > 0) {
-      response += '🎵 RELEASES:\n';
+      response += '**🎵 RELEASES:**\n';
       info.catalogs.slice(0, 5).forEach((track: any) => {
-        response += `• ${track.title} (${track.language})\n`;
+        response += `• *${track.title}* (${track.language})\n`;
         if (track.link) response += `  Listen here: ${track.link}\n`;
       });
       if (info.catalogs.length > 5) {
-        response += `+ ${info.catalogs.length - 5} more tracks! 🔥\n`;
+        response += `+ *${info.catalogs.length - 5} more tracks!* 🔥\n`;
       }
       response += '\n';
     }
 
     if (info.shows?.length > 0) {
-      response += '🎪 UPCOMING SHOWS:\n';
+      response += '**🎪 UPCOMING SHOWS:**\n';
       info.shows.forEach((show: any) => {
-        response += `• ${show.title} at ${show.venue}\n`;
+        response += `• *${show.title}* at *${show.venue}*\n`;
         if (show.ticket_link) response += `  Get tickets: ${show.ticket_link}\n`;
       });
       response += '\n';
     }
 
     if (info.projects?.length > 0) {
-      response += '🎹 PROJECTS:\n';
+      response += '**🎹 PROJECTS:**\n';
       info.projects.forEach((project: any) => {
-        response += `• ${project.title} (${project.status.toLowerCase()})\n`;
+        response += `• *${project.title}* (${project.status.toLowerCase()})\n`;
       });
     }
 
-    response += '\nFOLLOW @lebuhrayaselatan ON IG FOR MORE UPDATES! 🔥';
+    response += '\n**FOLLOW @lebuhrayaselatan ON IG FOR MORE UPDATES!** 🔥';
     return response;
+  }
+
+  private formatResponseForTelegram(text: string): string {
+    // Replace Markdown-style formatting with HTML
+    let formatted = text
+      // Headers
+      .replace(/^### (.*$)/gm, '<b>$1</b>')
+      .replace(/^## (.*$)/gm, '<b>$1</b>')
+      .replace(/^# (.*$)/gm, '<b>$1</b>')
+      
+      // Bold
+      .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+      
+      // Italic
+      .replace(/\*(.*?)\*/g, '<i>$1</i>')
+      
+      // Quotes
+      .replace(/^> (.*$)/gm, '\n<i>$1</i>\n')
+      
+      // Lists
+      .replace(/^\d\. /gm, '\n• ')
+      .replace(/^- /gm, '\n• ')
+      
+      // Clean up multiple newlines
+      .replace(/\n\s*\n/g, '\n\n')
+      .trim();
+
+    // Ensure proper spacing around HTML tags
+    formatted = formatted
+      .replace(/><\//g, '> </')
+      .replace(/><b>/g, '> <b>')
+      .replace(/><i>/g, '> <i>');
+
+    return formatted;
   }
 }
 
