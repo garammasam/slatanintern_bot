@@ -1463,17 +1463,17 @@ class GroupChatBot {
         console.error('Error searching shows:', showError);
       }
 
-      // Search projects - check main artist, collaborators, and track features
-      const { data: projectsArtist, error: projectError1 } = await supabase
+      // Search projects - check main artist and collaborators
+      const { data: projectsMain, error: projectError1 } = await supabase
         .from('projects')
         .select('*')
         .or(`artist.ilike.%${normalizedQuery}%,collaborators.cs.{${normalizedQuery}}`);
 
-      // Search for artist in track features
+      // Search for artist in track features using textual search
       const { data: projectsFeatures, error: projectError2 } = await supabase
         .from('projects')
         .select('*')
-        .contains('tracks', [{ features: [normalizedQuery] }]);
+        .textSearch('tracks', normalizedQuery);  // Changed to text search for JSON array
 
       if (projectError1 || projectError2) {
         console.error('Error searching projects:', projectError1 || projectError2);
@@ -1485,7 +1485,7 @@ class GroupChatBot {
       }
 
       // Combine and deduplicate projects
-      const allProjects = [...(projectsArtist || []), ...(projectsFeatures || [])];
+      const allProjects = [...(projectsMain || []), ...(projectsFeatures || [])];
       const projects = [...new Set(allProjects.map(p => JSON.stringify(p)))].map(p => JSON.parse(p));
 
       console.log(`Found catalogs: ${catalogs?.length || 0}`);
