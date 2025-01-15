@@ -1237,7 +1237,9 @@ class GroupChatBot {
     const artistMatch = messageTextLower.match(/(?:about|who|what|tell|info|songs?|tracks?|catalog|music|lagu|dengar|check|tengok|cari)\s+(?:by|from|about|untuk|oleh|daripada)?\s*([a-zA-Z0-9\s_]+)(?:\s+ke)?$/i);
     
     if (artistMatch) {
-        const artistName = artistMatch[1].trim();
+        const artistName = artistMatch[1].trim()
+            .replace(/^(?:lagu|songs?|music)\s+/i, '') // Remove 'lagu', 'song', 'music' prefix if present
+            .trim();
         console.log('Artist inquiry detected for:', artistName);
         try {
             // First try SLATAN knowledge base, then fall back to Supabase
