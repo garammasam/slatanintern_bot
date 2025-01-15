@@ -1437,22 +1437,22 @@ class GroupChatBot {
       // Normalize the artist query for case-insensitive search
       const normalizedQuery = artistQuery.toLowerCase().trim();
       
-      // Search catalogs - using case-insensitive array contains
+      // Search catalogs - using array contains
       const { data: catalogs, error: catalogError } = await supabase
         .from('catalogs')
-        .select()
-        .filter('artist', 'cs', `{${normalizedQuery}}`)  // Case-sensitive array contains
+        .select('*')
+        .contains('artist', [normalizedQuery])  // Changed from filter to contains
         .order('release_date', { ascending: false });
 
       if (catalogError) {
         console.error('Error searching catalogs:', catalogError);
       }
 
-      // Search shows - using case-insensitive array contains
+      // Search shows - using array contains
       const { data: shows, error: showError } = await supabase
         .from('shows')
-        .select()
-        .filter('artists', 'cs', `{${normalizedQuery}}`)  // Case-sensitive array contains
+        .select('*')
+        .contains('artists', [normalizedQuery])  // Changed from filter to contains
         .eq('status', 'upcoming')
         .order('date', { ascending: true });
 
@@ -1460,13 +1460,19 @@ class GroupChatBot {
         console.error('Error searching shows:', showError);
       }
 
-      // Search projects - check artist, collaborators, and track features
-      const { data: allProjects, error: projectError } = await supabase
+      // Search projects - using both direct artist match and collaborators array
+      const { data: projectsArtist, error: projectError1 } = await supabase
         .from('projects')
-        .select('*');
+        .select('*')
+        .ilike('artist', `%${normalizedQuery}%`);
 
-      if (projectError) {
-        console.error('Error searching projects:', projectError);
+      const { data: projectsCollab, error: projectError2 } = await supabase
+        .from('projects')
+        .select('*')
+        .contains('collaborators', [normalizedQuery]);
+
+      if (projectError1 || projectError2) {
+        console.error('Error searching projects:', projectError1 || projectError2);
         return {
           catalogs: catalogs || [],
           shows: shows || [],
@@ -1474,15 +1480,8 @@ class GroupChatBot {
         };
       }
 
-      // Filter projects where artist appears in any capacity
-      const projects = allProjects.filter(project => {
-        const isMainArtist = project.artist.toLowerCase() === normalizedQuery;
-        const isCollaborator = project.collaborators.some((c: string) => c.toLowerCase() === normalizedQuery);
-        const isFeatureArtist = project.tracks.some((track: ProjectTrack) => 
-          track.features?.some((f: string) => f.toLowerCase() === normalizedQuery)
-        );
-        return isMainArtist || isCollaborator || isFeatureArtist;
-      });
+      // Combine and deduplicate projects
+      const projects = [...new Set([...(projectsArtist || []), ...(projectsCollab || [])])];
 
       console.log(`Found catalogs: ${catalogs?.length || 0}`);
       console.log(`Found shows: ${shows?.length || 0}`);
