@@ -450,19 +450,37 @@ class CatalogAgent {
             const normalizedQuery = query.toLowerCase().trim();
             console.log('CatalogAgent searching for:', normalizedQuery);
 
-            const { data, error } = await this.supabase
+            // First try exact match with case-sensitive array contains
+            const { data: exactMatches, error: exactError } = await this.supabase
                 .from('catalogs')
                 .select('*')
                 .filter('artist', 'cs', `{"${normalizedQuery}"}`)
                 .order('release_date', { ascending: false });
 
-            if (error) {
-                console.error('CatalogAgent search error:', error);
-                return [];
+            if (exactError) {
+                console.error('CatalogAgent exact match error:', exactError);
             }
 
-            console.log('CatalogAgent found:', data?.length || 0, 'entries');
-            return data || [];
+            // If no exact matches, try case-insensitive partial match
+            if (!exactMatches?.length) {
+                console.log('No exact matches, trying partial match');
+                const { data: partialMatches, error: partialError } = await this.supabase
+                    .from('catalogs')
+                    .select('*')
+                    .or(`artist.ilike.%${normalizedQuery}%,artist.cs.{"${normalizedQuery}"}`)
+                    .order('release_date', { ascending: false });
+
+                if (partialError) {
+                    console.error('CatalogAgent partial match error:', partialError);
+                    return [];
+                }
+
+                console.log('CatalogAgent found partial matches:', partialMatches?.length || 0);
+                return partialMatches || [];
+            }
+
+            console.log('CatalogAgent found exact matches:', exactMatches.length);
+            return exactMatches;
         } catch (error) {
             console.error('CatalogAgent error:', error);
             return [];
@@ -1094,224 +1112,132 @@ class GroupChatBot {
     const messageText = ctx.message?.text;
     
     if (!groupId || !messageText) {
-      console.log('Missing groupId or messageText in mention handler');
-      return;
+        console.log('Missing groupId or messageText in mention handler');
+        return;
     }
 
     const messageTextLower = messageText.toLowerCase();
     const isNameMention = messageTextLower.includes('amat');
     
+    // Check for artist search request
+    const searchMatch = messageTextLower.match(/(?:search|cari|tengok|check)\s+(?:lagu|song|track|music)?\s*(\w+)/i);
+    if (searchMatch) {
+        const artistName = searchMatch[1];
+        console.log('Artist search request detected for:', artistName);
+        try {
+            const response = await this.handleArtistInquiry(artistName);
+            await ctx.reply(response, {
+                reply_to_message_id: ctx.message.message_id,
+                disable_web_page_preview: true
+            } as any);
+            return;
+        } catch (error) {
+            console.error('Error handling artist search:', error);
+            await ctx.reply('Alamak error la pulak! 😅 Try again later k bestie?', {
+                reply_to_message_id: ctx.message.message_id
+            });
+            return;
+        }
+    }
+
     // If it's a name mention without direct command/question, generate a casual response
     if (isNameMention && !messageTextLower.includes('@' + ctx.me.username?.toLowerCase())) {
-      try {
-        const completion = await this.openai.chat.completions.create({
-          model: "gpt-4o-mini-2024-07-18",
-          messages: [
-            {
-              role: "system",
-              content: `You are Amat, a chaotic Malaysian bot. Someone just mentioned your name. Generate a short, witty response in Malaysian slang (mix of Malay and English). Keep it under 15 words. Be playful and slightly chaotic. Use emojis. Reference the fact they mentioned your name.`
-            },
-            {
-              role: "user",
-              content: messageText
-            }
-          ],
-          temperature: 1.0,
-          max_tokens: 60,
-          presence_penalty: 0.9,
-          frequency_penalty: 0.9
-        });
-        
-        const response = completion.choices[0].message.content || 'Eh ada org sebut nama mbo ke? 👀';
-        await ctx.reply(response, {
-          reply_to_message_id: ctx.message.message_id,
-          disable_web_page_preview: true
-        } as any);
-        return;
-      } catch (error) {
-        console.error('Error generating name mention response:', error);
-      }
+        try {
+            const completion = await this.openai.chat.completions.create({
+                model: "gpt-4o-mini-2024-07-18",
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are Amat, a chaotic Malaysian bot. Someone just mentioned your name. Generate a short, witty response in Malaysian slang (mix of Malay and English). Keep it under 15 words. Be playful and slightly chaotic. Use emojis. Reference the fact they mentioned your name.`
+                    },
+                    {
+                        role: "user",
+                        content: messageText
+                    }
+                ],
+                temperature: 1.0,
+                max_tokens: 60,
+                presence_penalty: 0.9,
+                frequency_penalty: 0.9
+            });
+            
+            const response = completion.choices[0].message.content || 'Eh ada org sebut nama mbo ke? 👀';
+            await ctx.reply(response, {
+                reply_to_message_id: ctx.message.message_id,
+                disable_web_page_preview: true
+            } as any);
+            return;
+        } catch (error) {
+            console.error('Error generating name mention response:', error);
+        }
     }
     
     // Continue with existing mention handling logic
     // Check for self-awareness triggers first
     for (const [key, slang] of Object.entries(this.slangDB)) {
-      if (slang.category === 'criticism') {
-        // Check if in cooldown
-        const lastResponse = this.selfAwarenessCooldowns.get(groupId);
-        const now = Date.now();
-        
-        if (lastResponse && now - lastResponse < this.SELF_AWARENESS_COOLDOWN) {
-          // Generate dynamic cynical response
-          const response = await this.generateCynicalResponse(key);
-          await ctx.reply(response, {
-            reply_to_message_id: ctx.message.message_id,
-            disable_web_page_preview: true
-          } as any);
-          return;
-        }
-
-        // Check exact matches or example phrases
-        if (messageTextLower.includes(key) || slang.examples.some(ex => messageTextLower.includes(ex))) {
-          console.log('Self-awareness trigger detected:', key);
-          // Set cooldown
-          this.selfAwarenessCooldowns.set(groupId, now);
-          const response = slang.responses[Math.floor(Math.random() * slang.responses.length)];
-          await ctx.reply(response, {
-            reply_to_message_id: ctx.message.message_id,
-            disable_web_page_preview: true
-          } as any);
-          return;
-        }
-      }
-    }
-
-    // Check for merchandise inquiries first
-    if (messageTextLower.includes('slatan') || messageTextLower.includes('0108')) {
-      if (this.merchKeywords.regex.test(messageTextLower)) {
-        console.log('Merchandise inquiry detected, sending merch response...');
-        const merchResponse = this.handleMerchInquiry();
-        await ctx.reply(merchResponse, {
-          reply_to_message_id: ctx.message.message_id,
-          disable_web_page_preview: true
-        } as any);
-        return;
-      }
-      
-      if (this.socialKeywords.regex.test(messageTextLower)) {
-        console.log('Social media inquiry detected, sending social response...');
-        const socialResponse = this.handleSocialInquiry();
-        await ctx.reply(socialResponse, {
-          reply_to_message_id: ctx.message.message_id,
-          disable_web_page_preview: true
-        } as any);
-        return;
-      }
-
-      // Check for artist inquiry
-      const artistMatch = messageTextLower.match(
-        /(?:about|who|what|tell|info|songs?|tracks?|catalog|music|lagu|dengar|check|tengok|cari)\s+(?:by|from|about|untuk|oleh|daripada)?\s*([a-zA-Z0-9\s_]+)(?:\s+ke)?$/i
-      );
-
-      if (artistMatch) {
-        const artistName = artistMatch[1].trim();
-        console.log('Artist inquiry detected, searching for:', artistName);
-        try {
-          // Search in Supabase database
-          const { data: catalogs, error: catalogError } = await supabase
-            .from('catalogs')
-            .select('*')
-            .filter('artist', 'cs', `{${artistName}}`)
-            .order('release_date', { ascending: false });
-
-          if (catalogError) {
-            console.error('Error searching catalogs:', catalogError);
-            throw catalogError;
-          }
-
-          const { data: shows, error: showError } = await supabase
-            .from('shows')
-            .select('*')
-            .filter('artists', 'cs', `{${artistName}}`)
-            .eq('status', 'upcoming')
-            .order('date', { ascending: true });
-
-          if (showError) {
-            console.error('Error searching shows:', showError);
-            throw showError;
-          }
-
-          const { data: projects, error: projectError } = await supabase
-            .from('projects')
-            .select('*')
-            .or(`artist.eq.${artistName},collaborators.cs.{${artistName}}`);
-
-          if (projectError) {
-            console.error('Error searching projects:', projectError);
-            throw projectError;
-          }
-
-          // Format response in chaotic style
-          let response = `YOOO BESTIEEE! Mbo tgk ${artistName} punya stuff ni, chaos gileee! 🔥\n\n`;
-
-          if (catalogs?.length) {
-            response += `🎵 RELEASES (${catalogs.length} TRACKS):\n`;
-            catalogs.slice(0, 5).forEach(track => {
-              response += `- ${track.title} (${track.language}) DROP KAT ${track.release_date || 'TBA'} 🔥\n`;
-            });
-            if (catalogs.length > 5) {
-              response += `Mbo ada ${catalogs.length - 5} more tracks tp mbo malas nk type skrg HAHAHA\n`;
+        if (slang.category === 'criticism') {
+            // Check if in cooldown
+            const lastResponse = this.selfAwarenessCooldowns.get(groupId);
+            const now = Date.now();
+            
+            if (lastResponse && now - lastResponse < this.SELF_AWARENESS_COOLDOWN) {
+                // Generate dynamic cynical response
+                const response = await this.generateCynicalResponse(key);
+                await ctx.reply(response, {
+                    reply_to_message_id: ctx.message.message_id,
+                    disable_web_page_preview: true
+                } as any);
+                return;
             }
-            response += '\n';
-          }
 
-          if (shows?.length) {
-            response += `🎪 UPCOMING SHOWS:\n`;
-            shows.forEach(show => {
-              response += `- ${show.title} kt ${show.venue} (${show.date}) 🔥\n`;
-            });
-            response += '\n';
-          }
-
-          if (projects?.length) {
-            response += `🎹 PROJECTS:\n`;
-            projects.forEach(project => {
-              response += `- ${project.title} (${project.status.toLowerCase()}) with ${project.collaborators.join(', ')} 💫\n`;
-            });
-          }
-
-          if (!catalogs?.length && !shows?.length && !projects?.length) {
-            response = `Eh sori bestie, mbo search everywhere tp xjumpa apa2 about ${artistName} 😭 Tp jgn risau, kalau ada updates mbo inform u first! 💯`;
-          }
-
-          await ctx.reply(response, {
-            reply_to_message_id: ctx.message.message_id,
-            disable_web_page_preview: true
-          } as any);
-          return;
-        } catch (error) {
-          console.error('Error handling artist inquiry:', error);
-          await ctx.reply('Alamak bestie, database mbo crash jap. Try again later k? 😭', {
-            reply_to_message_id: ctx.message.message_id
-          });
-          return;
+            // Check exact matches or example phrases
+            if (messageTextLower.includes(key) || slang.examples.some(ex => messageTextLower.includes(ex))) {
+                console.log('Self-awareness trigger detected:', key);
+                // Set cooldown
+                this.selfAwarenessCooldowns.set(groupId, now);
+                const response = slang.responses[Math.floor(Math.random() * slang.responses.length)];
+                await ctx.reply(response, {
+                    reply_to_message_id: ctx.message.message_id,
+                    disable_web_page_preview: true
+                } as any);
+                return;
+            }
         }
-      }
     }
-    
+
     // Update conversation history
     this.updateMessageHistory(groupId, {
-      role: 'user',
-      content: messageText,
-      timestamp: Date.now()
+        role: 'user',
+        content: messageText,
+        timestamp: Date.now()
     });
     
     try {
-      console.log('Generating response for mention...');
-      const response = await this.generateResponse(groupId);
-      if (response) {
-        // Add some human-like delay
-        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-        console.log('Sending response:', response);
-        await ctx.reply(response, {
-          reply_to_message_id: ctx.message.message_id,
-          disable_web_page_preview: true
-        } as any);
-        
-        // Update history with bot's response
-        this.updateMessageHistory(groupId, {
-          role: 'assistant',
-          content: response,
-          timestamp: Date.now()
-        });
-      } else {
-        console.log('No response generated for mention');
-      }
+        console.log('Generating response for mention...');
+        const response = await this.generateResponse(groupId);
+        if (response) {
+            // Add some human-like delay
+            await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+            console.log('Sending response:', response);
+            await ctx.reply(response, {
+                reply_to_message_id: ctx.message.message_id,
+                disable_web_page_preview: true
+            } as any);
+            
+            // Update history with bot's response
+            this.updateMessageHistory(groupId, {
+                role: 'assistant',
+                content: response,
+                timestamp: Date.now()
+            });
+        } else {
+            console.log('No response generated for mention');
+        }
     } catch (error) {
-      console.error('Error in mention handler:', error);
-      throw error;
+        console.error('Error in mention handler:', error);
+        throw error;
     }
-  }
+}
   
   private updateMessageHistory(groupId: string, message: Message) {
     const history = this.config.messageHistory.get(groupId) || [];
