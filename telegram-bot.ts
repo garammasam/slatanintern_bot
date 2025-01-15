@@ -450,37 +450,56 @@ class CatalogAgent {
             const normalizedQuery = query.toLowerCase().trim();
             console.log('CatalogAgent searching for:', normalizedQuery);
 
-            // First try exact match with case-sensitive array contains
-            const { data: exactMatches, error: exactError } = await this.supabase
-                .from('catalogs')
-                .select('*')
-                .filter('artist', 'cs', `{"${normalizedQuery}"}`)
-                .order('release_date', { ascending: false });
+            // Try all case variations
+            const queries = [
+                normalizedQuery,                    // lowercase
+                normalizedQuery.toUpperCase(),      // uppercase
+                normalizedQuery.charAt(0).toUpperCase() + normalizedQuery.slice(1)  // capitalized
+            ];
 
-            if (exactError) {
-                console.error('CatalogAgent exact match error:', exactError);
+            let allMatches: DatabaseCatalogTrack[] = [];
+            
+            // Try each case variation
+            for (const q of queries) {
+                const { data: matches, error } = await this.supabase
+                    .from('catalogs')
+                    .select('*')
+                    .filter('artist', 'cs', `{"${q}"}`)
+                    .order('release_date', { ascending: false });
+
+                if (error) {
+                    console.error(`CatalogAgent search error for "${q}":`, error);
+                    continue;
+                }
+
+                if (matches?.length) {
+                    console.log(`Found ${matches.length} matches for "${q}"`);
+                    allMatches = [...allMatches, ...matches];
+                }
             }
 
-            // If no exact matches, try case-insensitive partial match
-            if (!exactMatches?.length) {
+            // If no exact matches found, try partial match
+            if (!allMatches.length) {
                 console.log('No exact matches, trying partial match');
                 const { data: partialMatches, error: partialError } = await this.supabase
                     .from('catalogs')
                     .select('*')
-                    .filter('artist', 'cs', `{"%${normalizedQuery}%"}`)
+                    .or(queries.map(q => `artist.cs.{"${q}%"}`).join(','))
                     .order('release_date', { ascending: false });
 
                 if (partialError) {
                     console.error('CatalogAgent partial match error:', partialError);
-                    return [];
+                } else if (partialMatches?.length) {
+                    console.log(`Found ${partialMatches.length} partial matches`);
+                    allMatches = partialMatches;
                 }
-
-                console.log('CatalogAgent found partial matches:', partialMatches?.length || 0);
-                return partialMatches || [];
             }
 
-            console.log('CatalogAgent found exact matches:', exactMatches.length);
-            return exactMatches;
+            // Remove duplicates
+            const uniqueMatches = Array.from(new Map(allMatches.map(item => [item.id, item])).values());
+            console.log(`Returning ${uniqueMatches.length} unique matches`);
+            return uniqueMatches;
+
         } catch (error) {
             console.error('CatalogAgent error:', error);
             return [];
