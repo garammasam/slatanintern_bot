@@ -1541,6 +1541,54 @@ class GroupChatBot {
     }
   }
 
+  private calculateEngagementLevel(history: Message[]): {
+    level: 'initial' | 'casual' | 'engaged' | 'active' | 'hyper',
+    recentInteractions: number,
+    timeWindow: number
+  } {
+    const now = Date.now();
+    const fiveMinutesAgo = now - 300000; // 5 minutes
+    const fifteenMinutesAgo = now - 900000; // 15 minutes
+    
+    // Count recent interactions
+    const recentMessages = history.filter(msg => msg.timestamp > fifteenMinutesAgo);
+    const veryRecentMessages = recentMessages.filter(msg => msg.timestamp > fiveMinutesAgo);
+    
+    // Calculate direct interactions (mentions, replies)
+    const directInteractions = recentMessages.filter(msg => 
+      msg.role === 'user' && (
+        msg.content.includes('@') || 
+        history.some(prevMsg => 
+          prevMsg.role === 'assistant' && 
+          msg.timestamp - prevMsg.timestamp < 300000
+        )
+      )
+    ).length;
+    
+    // Calculate engagement metrics
+    const recentInteractions = veryRecentMessages.length;
+    const timeWindow = recentMessages.length > 0 
+      ? now - Math.min(...recentMessages.map(msg => msg.timestamp))
+      : 0;
+    
+    // Determine engagement level
+    let level: 'initial' | 'casual' | 'engaged' | 'active' | 'hyper';
+    
+    if (directInteractions >= 3 && recentInteractions >= 4) {
+      level = 'hyper';
+    } else if (directInteractions >= 2 && recentInteractions >= 3) {
+      level = 'active';
+    } else if (directInteractions >= 1 && recentInteractions >= 2) {
+      level = 'engaged';
+    } else if (recentInteractions >= 1) {
+      level = 'casual';
+    } else {
+      level = 'initial';
+    }
+    
+    return { level, recentInteractions, timeWindow };
+  }
+
   private async generateResponse(groupId: string): Promise<string | null> {
     const history = this.getRecentHistory(groupId);
     
@@ -1550,26 +1598,47 @@ class GroupChatBot {
       // Get real-time context from Supabase
       const contextMessages = await this.enrichResponseContext(groupId);
       
+      // Calculate engagement level
+      const engagement = this.calculateEngagementLevel(history);
+      console.log('Current engagement level:', engagement);
+      
       // Analyze conversation context to determine chaos level
       const chaosLevel = this.analyzeChaosLevel(history);
-
-      // Determine if this is a direct reply/mention
-      const isDirectInteraction = history.length > 0 && 
-        (history[history.length - 1].content.includes('@') || 
-         history.some(msg => msg.role === 'assistant' && Date.now() - msg.timestamp < 300000)); // 5 minutes
-
-      // Check for continued engagement
-      const continuedEngagement = history.length > 1 && 
-        history[history.length - 2].role === 'assistant' && 
-        Date.now() - history[history.length - 2].timestamp < 300000; // 5 minutes
-
-      // Adjust max tokens based on interaction type
-      const maxTokens = continuedEngagement ? 500 : 100;
       
-      // Add conciseness instruction based on interaction type
-      const conciseInstruction = continuedEngagement
-        ? "You can be more expressive since the user is directly engaging with you."
-        : "Keep your response very concise (2-3 sentences max). Be punchy and impactful with your chaos rather than lengthy.";
+      // Determine response characteristics based on engagement
+      const responseConfig = {
+        initial: {
+          maxTokens: 60,
+          instruction: "Keep your response very short and casual (1-2 sentences). Just acknowledge or react briefly.",
+          temperature: 0.7
+        },
+        casual: {
+          maxTokens: 100,
+          instruction: "Keep your response concise (2-3 sentences). Add a bit of your personality but stay chill.",
+          temperature: 0.8
+        },
+        engaged: {
+          maxTokens: 150,
+          instruction: "You can be more expressive (3-4 sentences). Show more of your personality and engage with the topic.",
+          temperature: 0.9
+        },
+        active: {
+          maxTokens: 200,
+          instruction: "Be more detailed and chaotic. Express yourself freely but stay relevant to the conversation.",
+          temperature: 1.0
+        },
+        hyper: {
+          maxTokens: 300,
+          instruction: "Go full chaotic energy! Be expressive and entertaining, but still maintain some coherence.",
+          temperature: 1.0
+        }
+      }[engagement.level];
+      
+      // Add engagement context
+      const engagementContext = {
+        role: "system",
+        content: `Current engagement level: ${engagement.level}. ${responseConfig.instruction} Current chaos level: ${chaosLevel}.`
+      };
       
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini-2024-07-18",
@@ -1578,23 +1647,20 @@ class GroupChatBot {
             role: "system",
             content: personalityPrompt
           },
-          {
-            role: "system",
-            content: `Current chaos level: ${chaosLevel}. ${conciseInstruction}`
-          },
+          engagementContext,
           ...contextMessages,
           ...history.map(msg => ({
             role: msg.role,
             content: msg.content
           }))
         ],
-        temperature: 1.0, // Maximum creativity for chaos
-        max_tokens: maxTokens,
-        presence_penalty: 0.9, // Encourage more unique responses
-        frequency_penalty: 0.9 // Discourage repetition
+        temperature: responseConfig.temperature,
+        max_tokens: responseConfig.maxTokens,
+        presence_penalty: 0.9,
+        frequency_penalty: 0.9
       });
       
-      console.log('Generated chaotic response:', completion.choices[0].message.content);
+      console.log('Generated response:', completion.choices[0].message.content);
       return completion.choices[0].message.content;
     } catch (error) {
       console.error('Error in response generation:', error);
