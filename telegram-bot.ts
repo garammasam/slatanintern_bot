@@ -525,6 +525,9 @@ class ShowsAgent {
     async searchArtist(query: string): Promise<DatabaseShow[]> {
         try {
             console.log('ShowsAgent searching for:', query);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+
             const queries = [
                 query,                                    // original
                 query.toUpperCase(),                     // uppercase
@@ -540,7 +543,8 @@ class ShowsAgent {
                     .from('shows')
                     .select('*')
                     .filter('artists', 'cs', `{"${q}"}`)
-                    .order('date', { ascending: false });
+                    .gte('date', today.toISOString()) // Only get shows from today onwards
+                    .order('date', { ascending: true });
 
                 if (error) {
                     console.error(`ShowsAgent search error for "${q}":`, error);
@@ -560,7 +564,8 @@ class ShowsAgent {
                     .from('shows')
                     .select('*')
                     .or(queries.map(q => `artists.ilike.%${q}%`).join(','))
-                    .order('date', { ascending: false });
+                    .gte('date', today.toISOString()) // Only get shows from today onwards
+                    .order('date', { ascending: true });
 
                 if (containsError) {
                     console.error('ShowsAgent contains search error:', containsError);
@@ -570,9 +575,16 @@ class ShowsAgent {
                 }
             }
 
+            // Double check dates in JS to ensure accuracy
+            allMatches = allMatches.filter(show => {
+                const showDate = new Date(show.date);
+                showDate.setHours(0, 0, 0, 0);
+                return showDate >= today;
+            });
+
             // Remove duplicates
             const uniqueMatches = Array.from(new Map(allMatches.map((item: DatabaseShow) => [item.id, item])).values());
-            console.log(`Returning ${uniqueMatches.length} unique matches`);
+            console.log(`Returning ${uniqueMatches.length} unique upcoming matches`);
             return uniqueMatches;
 
         } catch (error) {
@@ -1357,17 +1369,34 @@ class GroupChatBot {
   }
   
   private async getUpcomingShows(): Promise<Show[]> {
-    const { data, error } = await supabase
-      .from('shows')
-      .select('*')
-      .eq('status', 'upcoming')
-      .order('date', { ascending: true });
-    
-    if (error) {
-      console.error('Error fetching shows:', error);
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
+      
+      const { data, error } = await supabase
+        .from('shows')
+        .select('*')
+        .gte('date', today.toISOString()) // Only get shows from today onwards
+        .order('date', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching shows:', error);
+        return [];
+      }
+
+      // Double check dates in JS to ensure accuracy
+      const upcomingShows = data.filter(show => {
+        const showDate = new Date(show.date);
+        showDate.setHours(0, 0, 0, 0);
+        return showDate >= today;
+      });
+
+      console.log(`Filtered ${upcomingShows.length} upcoming shows from ${data.length} total shows`);
+      return upcomingShows;
+    } catch (error) {
+      console.error('Error in getUpcomingShows:', error);
       return [];
     }
-    return data;
   }
 
   private async getProjects(status?: 'IN_PROGRESS' | 'COMPLETED'): Promise<Project[]> {
