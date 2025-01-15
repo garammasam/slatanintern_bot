@@ -251,7 +251,7 @@ const updatedSlangDB: SlangDatabase = {
     category: 'criticism',
     examples: ['cerewet', 'cerewet la', 'cerewet gile'],
     responses: [
-      'Eh sori2 kalau mbo cerewet sangat 😅',
+      'Eh sori2 kalau cringe 😅',
       'Ok ok mbo tak cerewet dah lepas ni 🙏',
       'Yelah, mbo chill sikit 🤫',
       'Fine, mbo kurangkan cerewet level 😶'
@@ -1544,100 +1544,90 @@ class GroupChatBot {
       const normalizedQuery = query.toLowerCase().trim();
 
       // Check if query is for a specific artist
-      if (specificArtists.includes(normalizedQuery)) {
-        const { catalogs, shows, projects } = await this.searchArtistInfo(query);
+      const { catalogs, shows, projects } = await this.searchArtistInfo(query);
 
-        let response = `YOOO GANG! 🔥 Let me put u on about ${query} FR FR! 🤪\n\n`;
-        
-        if (catalogs?.length) {
-          response += `🎵 RELEASES SHEEESH (${catalogs.length} TRACKS)! 💀\n`;
-          catalogs.slice(0, 5).forEach(track => {
-            response += `- ${track.title} DROPPED ON ${track.release_date || ''} and its ${track.duration || ''} of PURE HEAT! 🔥\n`;
+      // If no data in database, use OpenAI to generate info
+      if (!catalogs?.length && !shows?.length && !projects?.length) {
+        try {
+          const completion = await this.openai.chat.completions.create({
+            model: "gpt-4o-mini-2024-07-18",
+            messages: [
+              {
+                role: "system",
+                content: `You are a Malaysian music expert. Generate information about the artist "${query}" in a chaotic Malaysian style. Focus on their music, style, and impact. Keep it authentic and street. If you're not completely sure about some details, present them as rumors or what you've heard. Use emojis and Malaysian slang naturally.`
+              },
+              {
+                role: "user",
+                content: `Tell me about ${query} and their music`
+              }
+            ],
+            temperature: 0.9,
+            max_tokens: 250
           });
-          if (catalogs.length > 5) response += `NAH FR we got ${catalogs.length - 5} MORE TRACKS but my brain cant handle it rn fr fr\n`;
-          response += '\n';
-        }
 
-        if (shows?.length) {
-          response += `🎪 SHOWS LESGOOO (${shows.length})! 🤪\n`;
-          shows.slice(0, 3).forEach(show => {
-            response += `- ${show.title} at ${show.venue} on ${show.date} ITS GONNA BE CRAZY! 🔥\n`;
-          });
-          if (shows.length > 3) response += `BROO we got ${shows.length - 3} MORE SHOWS but im too hyped rn fr fr\n`;
-          response += '\n';
+          const info = completion.choices[0].message.content || '';
+          return `YO BESTIE! 🔥 Let me tell u what mbo tau about ${query}!\n\n${info}\n\nKalau ada updates or new info, mbo inform u first! 💯`;
+        } catch (error) {
+          console.error('Error generating artist info:', error);
+          return `YO GANG! Mbo ada system maintenance jap, try again later k? 😭`;
         }
-
-        if (projects?.length) {
-          const completedProjects = projects.filter(p => p.status === 'COMPLETED');
-          if (completedProjects.length) {
-            response += `🎹 RELEASED PROJECTS (${completedProjects.length})! 🔥\n`;
-            completedProjects.slice(0, 2).forEach(project => {
-              response += `- ✅ ${project.title} (${project.genre}) ABSOLUTE HEAT! 🤯\n`;
-            });
-            if (completedProjects.length > 2) response += `AND MORE BANGERS YOU GOTTA CHECK OUT FR FR!\n`;
-          }
-        }
-
-        // If no data found in database, try Google search
-        if (!catalogs?.length && !shows?.length && !projects?.length) {
-          const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(`${query} artist music`)}`;
-          return `YO BESTIE! 😭 Mbo xjumpa data ${query} dalam database, tp u boleh check kat Google:\n${googleSearchUrl}\n\nKalau ada updates, mbo inform u first! 💯`;
-        }
-
-        const closings = [
-          "\n\nIM ACTUALLY SHAKING RN FR FR! 🔥 STAY TUNED FOR MORE GANG!",
-          "\n\nNAH THIS TOO MUCH HEAT FR! 🤪 MORE COMING SOON NO CAP!",
-          "\n\nCANT EVEN HANDLE ALL THIS HEAT RN! 💀 LESGOOO!",
-          "\n\nSUPPORT LOCAL SCENE OR UR NOT VALID FR FR! 🔥 NO CAP NO CAP!"
-        ];
-        response += closings[Math.floor(Math.random() * closings.length)];
-        
-        return response;
-      } else {
-        // For non-specific artists, use regular search
-        const { catalogs, shows, projects } = await this.searchArtistInfo(query);
-        
-        if (!catalogs?.length && !shows?.length && !projects?.length) {
-          return `YO GANG I looked EVERYWHERE but cant find nothing bout ${query} rn fr fr! 😭 BUT WHEN THEY DROP SOMETHING IMMA BE THE FIRST TO TELL U NO CAP! 💯`;
-        }
-
-        // Regular response formatting for non-specific artists
-        let response = `YOOO GANG! 🔥 Let me put u on about ${query} FR FR! 🤪\n\n`;
-        
-        if (catalogs?.length) {
-          response += `🎵 RELEASES (${catalogs.length} TRACKS):\n`;
-          catalogs.slice(0, 5).forEach(track => {
-            response += `- ${track.title} (${track.language}) DROP KAT ${track.release_date || 'TBA'} 🔥\n`;
-          });
-          if (catalogs.length > 5) response += `Mbo ada ${catalogs.length - 5} more tracks tp mbo malas nk type skrg HAHAHA\n`;
-          response += '\n';
-        }
-
-        if (shows?.length) {
-          response += `🎪 UPCOMING SHOWS:\n`;
-          shows.forEach(show => {
-            response += `- ${show.title} kt ${show.venue} (${show.date}) 🔥\n`;
-          });
-          response += '\n';
-        }
-
-        if (projects?.length) {
-          response += `🎹 PROJECTS:\n`;
-          projects.forEach(project => {
-            response += `- ${project.title} (${project.status.toLowerCase()}) with ${project.collaborators.join(', ')} 💫\n`;
-          });
-        }
-
-        const closings = [
-          "\n\nNAH FR THIS IS CRAZY! 🔥 Stay locked in gang NO CAP!",
-          "\n\nIM TELLING U RN this one's gonna be DIFFERENT! 💫 SUPPORT LOCAL SCENE FR FR!",
-          "\n\nTHE LINEUP IS ACTUALLY INSANE BRO! 🎵🎵 More heat otw SHEEESH!",
-          "\n\nCANT EVEN HANDLE HOW FIRE THIS IS! 🔥 TGGU JE GANG!"
-        ];
-        response += closings[Math.floor(Math.random() * closings.length)];
-        
-        return response;
       }
+
+      // Check if query specifically asks about shows or projects
+      const isShowQuery = query.toLowerCase().includes('show') || query.toLowerCase().includes('gig') || query.toLowerCase().includes('concert');
+      const isProjectQuery = query.toLowerCase().includes('project') || query.toLowerCase().includes('collab') || query.toLowerCase().includes('album');
+
+      let response = `YOOO GANG! 🔥 Let me put u on about ${query} FR FR! 🤪\n\n`;
+      
+      // Always show catalog info first
+      if (catalogs?.length) {
+        response += `🎵 RELEASES SHEEESH (${catalogs.length} TRACKS)! 💀\n`;
+        catalogs.slice(0, 5).forEach(track => {
+          response += `- ${track.title} DROPPED ON ${track.release_date || ''} and its ${track.duration || ''} of PURE HEAT! 🔥\n`;
+        });
+        if (catalogs.length > 5) response += `NAH FR we got ${catalogs.length - 5} MORE TRACKS but my brain cant handle it rn fr fr\n`;
+        response += '\n';
+      }
+
+      // Only show shows info if specifically asked
+      if (isShowQuery && shows?.length) {
+        response += `🎪 SHOWS LESGOOO (${shows.length})! 🤪\n`;
+        shows.slice(0, 3).forEach(show => {
+          response += `- ${show.title} at ${show.venue} on ${show.date} ITS GONNA BE CRAZY! 🔥\n`;
+        });
+        if (shows.length > 3) response += `BROO we got ${shows.length - 3} MORE SHOWS but im too hyped rn fr fr\n`;
+        response += '\n';
+      }
+
+      // Only show projects info if specifically asked
+      if (isProjectQuery && projects?.length) {
+        const completedProjects = projects.filter(p => p.status === 'COMPLETED');
+        if (completedProjects.length) {
+          response += `🎹 RELEASED PROJECTS (${completedProjects.length})! 🔥\n`;
+          completedProjects.slice(0, 2).forEach(project => {
+            response += `- ✅ ${project.title} (${project.genre}) ABSOLUTE HEAT! 🤯\n`;
+          });
+          if (completedProjects.length > 2) response += `AND MORE BANGERS YOU GOTTA CHECK OUT FR FR!\n`;
+        }
+      }
+
+      const closings = [
+        "\n\nIM ACTUALLY SHAKING RN FR FR! 🔥 STAY TUNED FOR MORE GANG!",
+        "\n\nNAH THIS TOO MUCH HEAT FR! 🤪 MORE COMING SOON NO CAP!",
+        "\n\nCANT EVEN HANDLE ALL THIS HEAT RN! 💀 LESGOOO!",
+        "\n\nSUPPORT LOCAL SCENE OR UR NOT VALID FR FR! 🔥 NO CAP NO CAP!"
+      ];
+      response += closings[Math.floor(Math.random() * closings.length)];
+      
+      // Add hint about other info if available but not shown
+      if (!isShowQuery && shows?.length) {
+        response += "\n\nPS: Ask me about their shows if u wanna know more about upcoming gigs! 👀";
+      }
+      if (!isProjectQuery && projects?.length) {
+        response += "\n\nPS: Ask me about their projects if u wanna know more about their collabs! 🎹";
+      }
+      
+      return response;
     } catch (error) {
       console.error('Error in artist inquiry:', error);
       return 'YO GANG my brain stopped working fr fr! 💀 Try again later bestieee!';
