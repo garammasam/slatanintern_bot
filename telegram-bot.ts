@@ -441,6 +441,138 @@ interface DatabaseProject {
     }>;
 }
 
+// Add new agent classes for specialized searches
+class CatalogAgent {
+    constructor(private supabase: any) {}
+
+    async searchArtist(query: string): Promise<DatabaseCatalogTrack[]> {
+        try {
+            const normalizedQuery = query.toLowerCase().trim();
+            console.log('CatalogAgent searching for:', normalizedQuery);
+
+            const { data, error } = await this.supabase
+                .from('catalogs')
+                .select('*')
+                .filter('artist', 'cs', `{"${normalizedQuery}"}`)
+                .order('release_date', { ascending: false });
+
+            if (error) {
+                console.error('CatalogAgent search error:', error);
+                return [];
+            }
+
+            console.log('CatalogAgent found:', data?.length || 0, 'entries');
+            return data || [];
+        } catch (error) {
+            console.error('CatalogAgent error:', error);
+            return [];
+        }
+    }
+
+    formatResponse(catalogs: DatabaseCatalogTrack[]): string {
+        if (!catalogs.length) return '';
+
+        let response = `🎵 RELEASES (${catalogs.length} TRACKS):\n`;
+        catalogs.slice(0, 5).forEach(track => {
+            const releaseDate = track.release_date ? new Date(track.release_date).toLocaleDateString('en-MY') : 'TBA';
+            response += `- ${track.title} (${track.language}) - Released: ${releaseDate} ${track.link ? `\nListen here: ${track.link}` : ''}\n`;
+        });
+        if (catalogs.length > 5) {
+            response += `+ ${catalogs.length - 5} more tracks! 🔥\n`;
+        }
+        return response + '\n';
+    }
+}
+
+class ShowsAgent {
+    constructor(private supabase: any) {}
+
+    async searchArtist(query: string): Promise<DatabaseShow[]> {
+        try {
+            const normalizedQuery = query.toLowerCase().trim();
+            console.log('ShowsAgent searching for:', normalizedQuery);
+
+            const { data, error } = await this.supabase
+                .from('shows')
+                .select('*')
+                .filter('artists', 'cs', `{"${normalizedQuery}"}`)
+                .eq('status', 'upcoming')
+                .order('date', { ascending: true });
+
+            if (error) {
+                console.error('ShowsAgent search error:', error);
+                return [];
+            }
+
+            console.log('ShowsAgent found:', data?.length || 0, 'entries');
+            return data || [];
+        } catch (error) {
+            console.error('ShowsAgent error:', error);
+            return [];
+        }
+    }
+
+    formatResponse(shows: DatabaseShow[]): string {
+        if (!shows.length) return '';
+
+        let response = `🎪 UPCOMING SHOWS:\n`;
+        shows.forEach(show => {
+            const showDate = new Date(show.date).toLocaleDateString('en-MY');
+            response += `- ${show.title} at ${show.venue} (${showDate})\n`;
+            if (show.ticket_link) {
+                response += `  Get tickets: ${show.ticket_link}\n`;
+            }
+        });
+        return response + '\n';
+    }
+}
+
+class ProjectsAgent {
+    constructor(private supabase: any) {}
+
+    async searchArtist(query: string): Promise<DatabaseProject[]> {
+        try {
+            const normalizedQuery = query.toLowerCase().trim();
+            console.log('ProjectsAgent searching for:', normalizedQuery);
+
+            const { data, error } = await this.supabase
+                .from('projects')
+                .select('*')
+                .or(`artist.ilike.%${normalizedQuery}%,collaborators.cs.{"${normalizedQuery}"}`)
+                .order('deadline', { ascending: true });
+
+            if (error) {
+                console.error('ProjectsAgent search error:', error);
+                return [];
+            }
+
+            console.log('ProjectsAgent found:', data?.length || 0, 'entries');
+            return data || [];
+        } catch (error) {
+            console.error('ProjectsAgent error:', error);
+            return [];
+        }
+    }
+
+    formatResponse(projects: DatabaseProject[]): string {
+        if (!projects.length) return '';
+
+        let response = `🎹 PROJECTS:\n`;
+        projects.forEach(project => {
+            response += `- ${project.title} (${project.status.toLowerCase()})\n`;
+            if (project.tracks?.length > 0) {
+                project.tracks.slice(0, 3).forEach(track => {
+                    response += `  • ${track.title} - ${track.status.toLowerCase()}\n`;
+                });
+                if (project.tracks.length > 3) {
+                    response += `  • + ${project.tracks.length - 3} more tracks...\n`;
+                }
+            }
+        });
+        return response;
+    }
+}
+
 class GroupChatBot {
   private bot: Bot;
   private openai: OpenAI;
@@ -544,6 +676,10 @@ class GroupChatBot {
   private selfAwarenessCooldowns: Map<string, number> = new Map();
   private readonly SELF_AWARENESS_COOLDOWN = 180000; // 3 minutes cooldown
   
+  private catalogAgent: CatalogAgent;
+  private showsAgent: ShowsAgent;
+  private projectsAgent: ProjectsAgent;
+  
   constructor(config: BotConfig) {
     this.bot = new Bot(config.telegramToken);
     this.openai = new OpenAI({ apiKey: config.openaiKey });
@@ -554,6 +690,10 @@ class GroupChatBot {
     this.setupHandlers();
     this.setupMorningGreeting();
     this.setupNightGreeting();
+    
+    this.catalogAgent = new CatalogAgent(supabase);
+    this.showsAgent = new ShowsAgent(supabase);
+    this.projectsAgent = new ProjectsAgent(supabase);
   }
   
   private setupErrorHandling() {
@@ -1557,58 +1697,26 @@ class GroupChatBot {
 
   private async handleArtistInquiry(query: string): Promise<string> {
     try {
-        const normalizedQuery = query.toLowerCase().trim();
-        console.log('Processing artist inquiry for:', normalizedQuery);
+        console.log('Processing artist inquiry for:', query);
 
-        // Search in Supabase first
-        const { catalogs, shows, projects } = await this.searchArtistInfo(normalizedQuery);
+        // Parallel search using all agents
+        const [catalogs, shows, projects] = await Promise.all([
+            this.catalogAgent.searchArtist(query),
+            this.showsAgent.searchArtist(query),
+            this.projectsAgent.searchArtist(query)
+        ]);
+
         const hasData = catalogs.length > 0 || shows.length > 0 || projects.length > 0;
 
-        // If we have data, format it properly
         if (hasData) {
             let response = `YOOO GANG! 🔥 Let me tell u about ${query} FR FR! 🤪\n\n`;
 
-            // Format catalog data
-            if (catalogs.length > 0) {
-                response += `🎵 RELEASES (${catalogs.length} TRACKS):\n`;
-                (catalogs as DatabaseCatalogTrack[]).slice(0, 5).forEach(track => {
-                    const releaseDate = track.release_date ? new Date(track.release_date).toLocaleDateString('en-MY') : 'TBA';
-                    response += `- ${track.title} (${track.language}) - Released: ${releaseDate} ${track.link ? `\nListen here: ${track.link}` : ''}\n`;
-                });
-                if (catalogs.length > 5) {
-                    response += `+ ${catalogs.length - 5} more tracks! 🔥\n`;
-                }
-                response += '\n';
-            }
+            // Get formatted responses from each agent
+            const catalogResponse = this.catalogAgent.formatResponse(catalogs);
+            const showsResponse = this.showsAgent.formatResponse(shows);
+            const projectsResponse = this.projectsAgent.formatResponse(projects);
 
-            // Format shows data
-            if (shows.length > 0) {
-                response += `🎪 UPCOMING SHOWS:\n`;
-                (shows as DatabaseShow[]).forEach(show => {
-                    const showDate = new Date(show.date).toLocaleDateString('en-MY');
-                    response += `- ${show.title} at ${show.venue} (${showDate})\n`;
-                    if (show.ticket_link) {
-                        response += `  Get tickets: ${show.ticket_link}\n`;
-                    }
-                });
-                response += '\n';
-            }
-
-            // Format projects data
-            if (projects.length > 0) {
-                response += `🎹 PROJECTS:\n`;
-                (projects as DatabaseProject[]).forEach(project => {
-                    response += `- ${project.title} (${project.status.toLowerCase()})\n`;
-                    if (project.tracks?.length > 0) {
-                        project.tracks.slice(0, 3).forEach(track => {
-                            response += `  • ${track.title} - ${track.status.toLowerCase()}\n`;
-                        });
-                        if (project.tracks.length > 3) {
-                            response += `  • + ${project.tracks.length - 3} more tracks...\n`;
-                        }
-                    }
-                });
-            }
+            response += catalogResponse + showsResponse + projectsResponse;
 
             // Add a dynamic closing
             const closings = [
@@ -1622,7 +1730,6 @@ class GroupChatBot {
             return response;
         }
 
-        // If no data found, return a clear message instead of hallucinating
         return `Eh bestie, mbo tak jumpa data pasal ${query} dalam database 😅 Kalau ada updates nanti, mbo inform you first! 💯`;
 
     } catch (error) {
