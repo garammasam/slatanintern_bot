@@ -1440,22 +1440,22 @@ class GroupChatBot {
       // Normalize the artist query for case-insensitive search
       const normalizedQuery = artistQuery.toLowerCase().trim();
       
-      // Search catalogs - using array contains
+      // Search catalogs - using case-insensitive array containment
       const { data: catalogs, error: catalogError } = await supabase
         .from('catalogs')
         .select('*')
-        .contains('artist', [normalizedQuery])  // Changed from filter to contains
+        .filter('artist', 'ilike', `%${normalizedQuery}%`)  // Changed to case-insensitive pattern match
         .order('release_date', { ascending: false });
 
       if (catalogError) {
         console.error('Error searching catalogs:', catalogError);
       }
 
-      // Search shows - using array contains
+      // Search shows - using case-insensitive array containment
       const { data: shows, error: showError } = await supabase
         .from('shows')
         .select('*')
-        .contains('artists', [normalizedQuery])  // Changed from filter to contains
+        .filter('artists', 'ilike', `%${normalizedQuery}%`)  // Changed to case-insensitive pattern match
         .eq('status', 'upcoming')
         .order('date', { ascending: true });
 
@@ -1472,7 +1472,7 @@ class GroupChatBot {
       const { data: projectsCollab, error: projectError2 } = await supabase
         .from('projects')
         .select('*')
-        .contains('collaborators', [normalizedQuery]);
+        .filter('collaborators', 'ilike', `%${normalizedQuery}%`);  // Changed to case-insensitive pattern match
 
       if (projectError1 || projectError2) {
         console.error('Error searching projects:', projectError1 || projectError2);
