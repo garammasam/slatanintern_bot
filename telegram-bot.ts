@@ -792,17 +792,19 @@ class GroupChatBot {
       
       if (!userId || !groupId) return;
 
+      const messageText = ctx.message?.text || '';
       const isMentioned = ctx.message?.text?.includes('@' + ctx.me.username);
       const isReplyToBot = ctx.message?.reply_to_message?.from?.id === ctx.me.id;
+      const isNameMention = messageText.toLowerCase().includes('amat');
       
-      // Check user rate limit (bypass for mentions and direct replies)
-      if (!this.canUserSendMessage(userId) && !isMentioned && !isReplyToBot) {
+      // Check user rate limit (bypass for mentions, name mentions, and direct replies)
+      if (!this.canUserSendMessage(userId) && !isMentioned && !isReplyToBot && !isNameMention) {
         console.log('User rate limited:', userId);
         return;
       }
 
-      // Check group rate limit (bypass for mentions and direct replies)
-      if (!this.canGroupReceiveResponse(groupId) && !isMentioned && !isReplyToBot) {
+      // Check group rate limit (bypass for mentions, name mentions, and direct replies)
+      if (!this.canGroupReceiveResponse(groupId) && !isMentioned && !isReplyToBot && !isNameMention) {
         console.log('Group rate limited:', groupId);
         return;
       }
@@ -816,19 +818,20 @@ class GroupChatBot {
         messageText: ctx.message?.text,
         isMentioned: isMentioned,
         isReplyToBot: isReplyToBot,
+        isNameMention: isNameMention,
         botUsername: ctx.me.username
       });
 
       try {
-        // Always respond to mentions and direct replies, otherwise use shouldRespond
-        if (isMentioned || isReplyToBot) {
-          console.log('Bot was mentioned or directly replied to, handling direct response...');
+        // Always respond to mentions, name mentions, and direct replies
+        if (isMentioned || isReplyToBot || isNameMention) {
+          console.log('Bot was mentioned, called by name, or directly replied to, handling direct response...');
           await this.handleDirectMention(ctx);
         } else if (this.shouldRespond(ctx)) {
           console.log('Random response triggered, handling group message...');
           await this.handleGroupMessage(ctx);
         } else {
-          console.log('Skipping response (not mentioned/replied and random threshold not met)');
+          console.log('Skipping response (not mentioned/replied/named and random threshold not met)');
         }
       } catch (error) {
         console.error('Error in message handler:', error);
