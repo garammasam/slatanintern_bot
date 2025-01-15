@@ -411,6 +411,36 @@ interface Quote {
   author: string;
 }
 
+interface DatabaseCatalogTrack {
+    id: string;
+    title: string;
+    artist: string[];
+    language: string;
+    duration: string;
+    release_date: string;
+    isrc: string;
+    link?: string;
+    type: string;
+}
+
+interface DatabaseShow {
+    id: string;
+    title: string;
+    venue: string;
+    date: string;
+    ticket_link?: string;
+}
+
+interface DatabaseProject {
+    id: number;
+    title: string;
+    status: string;
+    tracks: Array<{
+        title: string;
+        status: string;
+    }>;
+}
+
 class GroupChatBot {
   private bot: Bot;
   private openai: OpenAI;
@@ -1437,73 +1467,63 @@ class GroupChatBot {
 
   private async searchArtistInfo(artistQuery: string) {
     try {
-      // Normalize the artist query for case-insensitive search
-      const normalizedQuery = artistQuery.toLowerCase().trim();
-      
-      // Search catalogs - using array contains for artist array
-      const { data: catalogs, error: catalogError } = await supabase
-        .from('catalogs')
-        .select('*')
-        .contains('artist', [normalizedQuery])
-        .order('release_date', { ascending: false });
+        // Clean and normalize the query
+        const normalizedQuery = artistQuery.toLowerCase().trim();
+        console.log('Searching for artist:', normalizedQuery);
 
-      if (catalogError) {
-        console.error('Error searching catalogs:', catalogError);
-      }
+        // Parallel queries for better performance
+        const [catalogsResult, showsResult, projectsResult] = await Promise.all([
+            // Search catalogs with case-insensitive array contains
+            supabase
+                .from('catalogs')
+                .select('*')
+                .filter('artist', 'cs', `{${normalizedQuery}}`)
+                .order('release_date', { ascending: false }),
 
-      // Search shows - using array contains for artists array
-      const { data: shows, error: showError } = await supabase
-        .from('shows')
-        .select('*')
-        .contains('artists', [normalizedQuery])
-        .eq('status', 'upcoming')
-        .order('date', { ascending: true });
+            // Search shows with case-insensitive array contains
+            supabase
+                .from('shows')
+                .select('*')
+                .filter('artists', 'cs', `{${normalizedQuery}}`)
+                .eq('status', 'upcoming')
+                .order('date', { ascending: true }),
 
-      if (showError) {
-        console.error('Error searching shows:', showError);
-      }
+            // Search projects - both as main artist and collaborator
+            supabase
+                .from('projects')
+                .select('*')
+                .or(`artist.ilike.%${normalizedQuery}%,collaborators.cs.{${normalizedQuery}}`)
+                .order('deadline', { ascending: true })
+        ]);
 
-      // Search projects - check main artist and collaborators
-      const { data: projectsMain, error: projectError1 } = await supabase
-        .from('projects')
-        .select('*')
-        .or(`artist.ilike.%${normalizedQuery}%,collaborators.cs.{${normalizedQuery}}`);
+        // Handle any errors
+        if (catalogsResult.error) {
+            console.error('Error searching catalogs:', catalogsResult.error);
+        }
+        if (showsResult.error) {
+            console.error('Error searching shows:', showsResult.error);
+        }
+        if (projectsResult.error) {
+            console.error('Error searching projects:', projectsResult.error);
+        }
 
-      // Search for artist in track features using textual search
-      const { data: projectsFeatures, error: projectError2 } = await supabase
-        .from('projects')
-        .select('*')
-        .textSearch('tracks', normalizedQuery);  // Changed to text search for JSON array
+        // Log results for debugging
+        console.log(`Found catalogs: ${catalogsResult.data?.length || 0}`);
+        console.log(`Found shows: ${showsResult.data?.length || 0}`);
+        console.log(`Found projects: ${projectsResult.data?.length || 0}`);
 
-      if (projectError1 || projectError2) {
-        console.error('Error searching projects:', projectError1 || projectError2);
         return {
-          catalogs: catalogs || [],
-          shows: shows || [],
-          projects: []
+            catalogs: catalogsResult.data || [],
+            shows: showsResult.data || [],
+            projects: projectsResult.data || []
         };
-      }
-
-      // Combine and deduplicate projects
-      const allProjects = [...(projectsMain || []), ...(projectsFeatures || [])];
-      const projects = [...new Set(allProjects.map(p => JSON.stringify(p)))].map(p => JSON.parse(p));
-
-      console.log(`Found catalogs: ${catalogs?.length || 0}`);
-      console.log(`Found shows: ${shows?.length || 0}`);
-      console.log(`Found projects: ${projects?.length || 0}`);
-
-      return {
-        catalogs: catalogs || [],
-        shows: shows || [],
-        projects: projects
-      };
     } catch (error) {
-      console.error('Error in searchArtistInfo:', error);
-      return {
-        catalogs: [],
-        shows: [],
-        projects: []
-      };
+        console.error('Error in searchArtistInfo:', error);
+        return {
+            catalogs: [],
+            shows: [],
+            projects: []
+        };
     }
   }
 
@@ -1543,98 +1563,77 @@ class GroupChatBot {
 
   private async handleArtistInquiry(query: string): Promise<string> {
     try {
-      // List of specific artists to handle
-      const specificArtists = ['quai', 'jaystation', 'gard wuzgut', 'offgrid', 'akkimwaru', 'nobi', 'shilky', 'maatjet'];
-      const normalizedQuery = query.toLowerCase().trim();
+        const normalizedQuery = query.toLowerCase().trim();
+        console.log('Processing artist inquiry for:', normalizedQuery);
 
-      // Check if query is for a specific artist
-      const { catalogs, shows, projects } = await this.searchArtistInfo(query);
+        // Search in Supabase first
+        const { catalogs, shows, projects } = await this.searchArtistInfo(normalizedQuery);
+        const hasData = catalogs.length > 0 || shows.length > 0 || projects.length > 0;
 
-      // If no data in database, use OpenAI to generate info
-      if (!catalogs?.length && !shows?.length && !projects?.length) {
-        try {
-          const completion = await this.openai.chat.completions.create({
-            model: "gpt-4o-mini-2024-07-18",
-            messages: [
-              {
-                role: "system",
-                content: `You are a Malaysian music expert. Generate information about the artist "${query}" in a chaotic Malaysian style. Focus on their music, style, and impact. Keep it authentic and street. If you're not completely sure about some details, present them as rumors or what you've heard. Use emojis and Malaysian slang naturally.`
-              },
-              {
-                role: "user",
-                content: `Tell me about ${query} and their music`
-              }
-            ],
-            temperature: 0.9,
-            max_tokens: 250
-          });
+        // If we have data, format it properly
+        if (hasData) {
+            let response = `YOOO GANG! 🔥 Let me tell u about ${query} FR FR! 🤪\n\n`;
 
-          const info = completion.choices[0].message.content || '';
-          return `YO BESTIE! 🔥 Let me tell u what mbo tau about ${query}!\n\n${info}\n\nKalau ada updates or new info, mbo inform u first! 💯`;
-        } catch (error) {
-          console.error('Error generating artist info:', error);
-          return `YO GANG! Mbo ada system maintenance jap, try again later k? 😭`;
+            // Format catalog data
+            if (catalogs.length > 0) {
+                response += `🎵 RELEASES (${catalogs.length} TRACKS):\n`;
+                (catalogs as DatabaseCatalogTrack[]).slice(0, 5).forEach(track => {
+                    const releaseDate = track.release_date ? new Date(track.release_date).toLocaleDateString('en-MY') : 'TBA';
+                    response += `- ${track.title} (${track.language}) - Released: ${releaseDate} ${track.link ? `\nListen here: ${track.link}` : ''}\n`;
+                });
+                if (catalogs.length > 5) {
+                    response += `+ ${catalogs.length - 5} more tracks! 🔥\n`;
+                }
+                response += '\n';
+            }
+
+            // Format shows data
+            if (shows.length > 0) {
+                response += `🎪 UPCOMING SHOWS:\n`;
+                (shows as DatabaseShow[]).forEach(show => {
+                    const showDate = new Date(show.date).toLocaleDateString('en-MY');
+                    response += `- ${show.title} at ${show.venue} (${showDate})\n`;
+                    if (show.ticket_link) {
+                        response += `  Get tickets: ${show.ticket_link}\n`;
+                    }
+                });
+                response += '\n';
+            }
+
+            // Format projects data
+            if (projects.length > 0) {
+                response += `🎹 PROJECTS:\n`;
+                (projects as DatabaseProject[]).forEach(project => {
+                    response += `- ${project.title} (${project.status.toLowerCase()})\n`;
+                    if (project.tracks?.length > 0) {
+                        project.tracks.slice(0, 3).forEach(track => {
+                            response += `  • ${track.title} - ${track.status.toLowerCase()}\n`;
+                        });
+                        if (project.tracks.length > 3) {
+                            response += `  • + ${project.tracks.length - 3} more tracks...\n`;
+                        }
+                    }
+                });
+            }
+
+            // Add a dynamic closing
+            const closings = [
+                "\n\nTHIS IS PURE HEAT FR FR! 🔥 STAY TUNED FOR MORE!",
+                "\n\nNO CAP, THE SCENE IS BLESSED! 💯 MORE COMING SOON!",
+                "\n\nSUPPORT LOCAL ARTISTS OR YOU'RE NOT VALID! 🙏",
+                "\n\nTHIS IS JUST THE BEGINNING! WATCH THIS SPACE! 🚀"
+            ];
+            response += closings[Math.floor(Math.random() * closings.length)];
+
+            return response;
         }
-      }
 
-      // Check if query specifically asks about shows or projects
-      const isShowQuery = query.toLowerCase().includes('show') || query.toLowerCase().includes('gig') || query.toLowerCase().includes('concert');
-      const isProjectQuery = query.toLowerCase().includes('project') || query.toLowerCase().includes('collab') || query.toLowerCase().includes('album');
+        // If no data found, return a clear message instead of hallucinating
+        return `Eh bestie, mbo tak jumpa data pasal ${query} dalam database 😅 Kalau ada updates nanti, mbo inform you first! 💯`;
 
-      let response = `YOOO GANG! 🔥 Let me put u on about ${query} FR FR! 🤪\n\n`;
-      
-      // Always show catalog info first
-      if (catalogs?.length) {
-        response += `🎵 RELEASES SHEEESH (${catalogs.length} TRACKS)! 💀\n`;
-        catalogs.slice(0, 5).forEach(track => {
-          response += `- ${track.title} DROPPED ON ${track.release_date || ''} and its ${track.duration || ''} of PURE HEAT! 🔥\n`;
-        });
-        if (catalogs.length > 5) response += `NAH FR we got ${catalogs.length - 5} MORE TRACKS but my brain cant handle it rn fr fr\n`;
-        response += '\n';
-      }
-
-      // Only show shows info if specifically asked
-      if (isShowQuery && shows?.length) {
-        response += `🎪 SHOWS LESGOOO (${shows.length})! 🤪\n`;
-        shows.slice(0, 3).forEach(show => {
-          response += `- ${show.title} at ${show.venue} on ${show.date} ITS GONNA BE CRAZY! 🔥\n`;
-        });
-        if (shows.length > 3) response += `BROO we got ${shows.length - 3} MORE SHOWS but im too hyped rn fr fr\n`;
-        response += '\n';
-      }
-
-      // Only show projects info if specifically asked
-      if (isProjectQuery && projects?.length) {
-        const completedProjects = projects.filter(p => p.status === 'COMPLETED');
-        if (completedProjects.length) {
-          response += `🎹 RELEASED PROJECTS (${completedProjects.length})! 🔥\n`;
-          completedProjects.slice(0, 2).forEach(project => {
-            response += `- ✅ ${project.title} (${project.genre}) ABSOLUTE HEAT! 🤯\n`;
-          });
-          if (completedProjects.length > 2) response += `AND MORE BANGERS YOU GOTTA CHECK OUT FR FR!\n`;
-        }
-      }
-
-      const closings = [
-        "\n\nIM ACTUALLY SHAKING RN FR FR! 🔥 STAY TUNED FOR MORE GANG!",
-        "\n\nNAH THIS TOO MUCH HEAT FR! 🤪 MORE COMING SOON NO CAP!",
-        "\n\nCANT EVEN HANDLE ALL THIS HEAT RN! 💀 LESGOOO!",
-        "\n\nSUPPORT LOCAL SCENE OR UR NOT VALID FR FR! 🔥 NO CAP NO CAP!"
-      ];
-      response += closings[Math.floor(Math.random() * closings.length)];
-      
-      // Add hint about other info if available but not shown
-      if (!isShowQuery && shows?.length) {
-        response += "\n\nPS: Ask me about their shows if u wanna know more about upcoming gigs! 👀";
-      }
-      if (!isProjectQuery && projects?.length) {
-        response += "\n\nPS: Ask me about their projects if u wanna know more about their collabs! 🎹";
-      }
-      
-      return response;
     } catch (error) {
-      console.error('Error in artist inquiry:', error);
-      return 'YO GANG my brain stopped working fr fr! 💀 Try again later bestieee!';
+        console.error('Error in artist inquiry:', error);
+        return 'Alamak error la pulak! 😅 Try again later k bestie?';
     }
   }
 
