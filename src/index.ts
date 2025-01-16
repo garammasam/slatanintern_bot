@@ -17,8 +17,8 @@ async function main() {
     console.log('🤖 Initializing Malaysian Group Chat Bot...');
 
     // Validate environment variables
-    if (!process.env.TELEGRAM_BOT_TOKEN) {
-      throw new Error('TELEGRAM_BOT_TOKEN is required');
+    if (!process.env.TELEGRAM_TOKEN) {
+      throw new Error('TELEGRAM_TOKEN is required');
     }
 
     if (!process.env.OPENAI_API_KEY) {
@@ -31,7 +31,7 @@ async function main() {
 
     // Initialize configuration
     const botConfig: BotConfig = {
-      telegramToken: process.env.TELEGRAM_BOT_TOKEN,
+      telegramToken: process.env.TELEGRAM_TOKEN,
       openaiKey: process.env.OPENAI_API_KEY,
       supabaseUrl: process.env.SUPABASE_URL,
       supabaseKey: process.env.SUPABASE_KEY,
