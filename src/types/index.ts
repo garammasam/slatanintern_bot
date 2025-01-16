@@ -149,7 +149,7 @@ export interface ILanguageAgent {
   shutdown(): Promise<void>;
   enrichSlangContext(message: string): Promise<string[]>;
   getSlangResponse(message: string): Promise<string | null>;
-  enhanceResponse(response: string): Promise<string>;
+  enhanceResponse(response: string, groupId: string): Promise<string>;
 }
 
 export interface ISchedulerAgent extends IAgent {

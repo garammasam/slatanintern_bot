@@ -191,8 +191,8 @@ export class ConversationAgent implements IConversationAgent {
         throw new Error('Empty response from OpenAI');
       }
 
-      // Process response through LanguageAgent for final touches
-      const enhancedResponse = await this.languageAgent.enhanceResponse(response);
+      // Pass groupId to enhanceResponse for sass tracking
+      const enhancedResponse = await this.languageAgent.enhanceResponse(response, groupId);
       console.log('✨ ConversationAgent: Generated response:', enhancedResponse);
       
       return enhancedResponse;

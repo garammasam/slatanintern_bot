@@ -3,6 +3,9 @@ import { OpenAI } from 'openai';
 
 export class LanguageAgent implements ILanguageAgent {
   private openai: OpenAI;
+  private sassLevels: Map<string, number> = new Map();
+  private readonly MAX_SASS = 10;
+  private readonly SASS_INCREMENT = 0.5;
 
   constructor() {
     console.log('🗣️ LanguageAgent: Initializing...');
@@ -90,34 +93,47 @@ export class LanguageAgent implements ILanguageAgent {
     }
   }
 
-  public async enhanceResponse(response: string): Promise<string> {
+  private getSassLevel(groupId: string): number {
+    const currentLevel = this.sassLevels.get(groupId) || 0;
+    const newLevel = Math.min(currentLevel + this.SASS_INCREMENT, this.MAX_SASS);
+    this.sassLevels.set(groupId, newLevel);
+    return newLevel;
+  }
+
+  public async enhanceResponse(response: string, groupId: string): Promise<string> {
     console.log('✨ LanguageAgent: Enhancing response');
     try {
+      const sassLevel = this.getSassLevel(groupId);
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini-2024-07-18",
         messages: [
           {
             role: "system",
-            content: `Enhance the given response to be more natural in Malaysian context:
-                     1. Keep the original meaning
+            content: `Enhance the given response with sass level ${sassLevel}/10:
+                     1. Keep the original meaning but add attitude
                      2. Make it sound more casual and authentic
-                     3. Add at most one emoji if appropriate
-                     4. Keep it concise
-                     5. Don't make it overly enthusiastic`
+                     3. Add playful teasing or mild roasting
+                     4. Add at most one emoji if appropriate
+                     5. Keep it concise
+                     6. Sass guidelines by level:
+                        - Level 0-3: Slightly playful, occasional teasing
+                        - Level 4-6: More sarcastic, witty comebacks
+                        - Level 7-10: Full sass mode, playful roasting
+                     Current sass level: ${sassLevel}`
           },
           {
             role: "user",
             content: response
           }
         ],
-        temperature: 0.7,
+        temperature: 0.7 + (sassLevel / 20), // Increase randomness with sass
         max_tokens: 150
       });
 
       const enhancedResponse = completion.choices[0].message.content;
       if (!enhancedResponse) return response;
 
-      console.log('✨ LanguageAgent: Response enhanced');
+      console.log(`✨ LanguageAgent: Response enhanced (Sass Level: ${sassLevel})`);
       return enhancedResponse;
     } catch (error) {
       console.error('✨ LanguageAgent: Error enhancing response:', error);
