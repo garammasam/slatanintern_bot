@@ -187,3 +187,103 @@ npm run dev  # Development
 ## License 📝
 
 MIT License 
+
+## Project Structure 🏗️
+
+### Agent-Based Architecture
+The bot is built using a modular agent-based architecture:
+
+- `CoreAgent`: Main bot lifecycle and health management
+  - Bot initialization and shutdown
+  - Health checks and keep-alive mechanism
+  - Error handling and reconnection logic
+
+- `MessageAgent`: Message processing and routing
+  - Rate limiting and cooldowns
+  - Direct mention handling
+  - Group message processing
+
+- `ConversationAgent`: Chat management with OpenAI
+  - Message history tracking
+  - Context enrichment
+  - Response generation
+
+- `ModerationAgent`: Group moderation features
+  - Kick command with voting
+  - Poll creation and management
+  - Admin permission checks
+
+- `DatabaseAgent`: Supabase interactions
+  - Artist catalog queries
+  - Show information
+  - Project tracking
+
+- `LanguageAgent`: Malaysian language features
+  - Slang detection and responses
+  - Context enrichment
+  - Language mixing management
+
+- `SchedulerAgent`: Scheduled tasks
+  - Morning/night greetings
+  - Daily quotes
+  - Scheduled announcements
+
+- `InquiryAgent`: Specific query handling
+  - Merchandise inquiries
+  - Social media information
+  - Artist and project details
+
+### Directory Structure
+```
+├── src/
+│   ├── agents/           # Agent implementations
+│   │   ├── CoreAgent.ts
+│   │   ├── MessageAgent.ts
+│   │   ├── ConversationAgent.ts
+│   │   ├── ModerationAgent.ts
+│   │   ├── DatabaseAgent.ts
+│   │   ├── LanguageAgent.ts
+│   │   ├── SchedulerAgent.ts
+│   │   └── InquiryAgent.ts
+│   ├── types/           # TypeScript interfaces
+│   │   └── index.ts
+│   └── index.ts        # Main entry point
+├── .env                # Environment variables
+├── .cursorrules        # Cursor IDE rules
+├── package.json        # Dependencies
+├── tsconfig.json       # TypeScript config
+└── Dockerfile         # Docker configuration
+```
+
+## Development Guidelines 🛠️
+
+### Adding New Features
+1. Identify the appropriate agent for the feature
+2. Update the corresponding interface in `types/index.ts`
+3. Implement the feature in the agent class
+4. Add tests if applicable
+5. Update documentation
+
+### Modifying Existing Agents
+1. Check `.cursorrules` for coding standards
+2. Ensure backward compatibility
+3. Update type definitions
+4. Test all affected functionality
+
+### Code Style
+- Follow TypeScript best practices
+- Use async/await for promises
+- Add proper error handling
+- Include detailed logging
+- Document public methods
+
+### Testing
+```bash
+npm run test        # Run all tests
+npm run test:watch  # Watch mode for development
+```
+
+### Debugging
+```bash
+npm run dev:debug   # Run with debugger
+``` 

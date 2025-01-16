@@ -2,12 +2,12 @@
   "name": "telegram-bot",
   "version": "1.0.0",
   "description": "A Telegram group chat bot powered by GPT-4",
-  "main": "dist/telegram-bot.js",
+  "main": "dist/src/index.js",
   "scripts": {
     "prebuild": "rm -rf dist",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/telegram-bot.js",
-    "dev": "ts-node telegram-bot.ts"
+    "start": "node dist/src/index.js",
+    "dev": "ts-node src/index.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.12",

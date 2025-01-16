@@ -1,0 +1,101 @@
+# Malaysian Group Chat Bot - Cursor Rules
+
+# Agent Development Guidelines
+1. Each agent should have a single responsibility
+2. All public methods must be defined in the corresponding interface
+3. Agents should not directly reference each other (use interfaces)
+4. Always handle errors and add logging
+5. Include proper TypeScript types
+
+# Code Style
+- Use 2 spaces for indentation
+- Use single quotes for strings
+- Use semicolons at the end of statements
+- Use PascalCase for class names
+- Use camelCase for method names
+- Use UPPER_CASE for constants
+- Maximum line length: 100 characters
+
+# Type Definitions
+- Define interfaces in types/index.ts
+- Use explicit return types
+- Avoid 'any' type when possible
+- Use union types for specific values
+- Document complex types
+
+# Error Handling
+- Use try/catch blocks for async operations
+- Log errors with context
+- Provide user-friendly error messages
+- Handle edge cases explicitly
+- Don't swallow errors silently
+
+# Logging Standards
+- Use console.error for errors
+- Use console.warn for warnings
+- Use console.info for important info
+- Use console.debug for debug info
+- Include relevant context in logs
+
+# Agent Communication
+- Use interfaces for agent dependencies
+- Pass dependencies through constructors
+- Don't share mutable state
+- Use events for cross-agent communication
+- Document agent interactions
+
+# Testing Requirements
+- Write unit tests for new features
+- Test edge cases and error conditions
+- Mock external dependencies
+- Test agent interactions
+- Include integration tests
+
+# Documentation
+- Document public methods
+- Explain complex logic
+- Update README for new features
+- Include usage examples
+- Document environment variables
+
+# Performance Guidelines
+- Minimize API calls
+- Cache frequently used data
+- Use proper rate limiting
+- Clean up resources in shutdown
+- Monitor memory usage
+
+# Security Rules
+- Validate user input
+- Check permissions
+- Don't expose sensitive data
+- Use environment variables for secrets
+- Follow Telegram bot security best practices
+
+# Malaysian Language Guidelines
+- Support both Malay and English
+- Use proper slang context
+- Keep responses casual but respectful
+- Include appropriate emojis
+- Follow cultural norms
+
+# Bot Behavior
+- Maintain conversation context
+- Use appropriate response times
+- Handle group dynamics
+- Respect user preferences
+- Follow rate limits
+
+# Database Interactions
+- Use prepared statements
+- Handle connection errors
+- Implement proper caching
+- Clean up connections
+- Follow Supabase best practices
+
+# Deployment Guidelines
+- Test in staging first
+- Use proper versioning
+- Document deployment steps
+- Monitor performance
+- Have rollback plans 
