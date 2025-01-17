@@ -1,12 +1,11 @@
 import { ILanguageAgent } from '../types';
 import { OpenAI } from 'openai';
-import { AMAT_PERSONALITY } from '../config/amat-personality';
 
 export class LanguageAgent implements ILanguageAgent {
   private openai: OpenAI;
   private sassLevels: Map<string, number> = new Map();
-  private readonly MAX_SASS = AMAT_PERSONALITY.sassiness.max;
-  private readonly SASS_INCREMENT = AMAT_PERSONALITY.sassiness.increment;
+  private readonly MAX_SASS = 10;
+  private readonly SASS_INCREMENT = 0.5;
 
   private readonly SLANG_PATTERNS = {
     greetings: {
@@ -138,7 +137,7 @@ export class LanguageAgent implements ILanguageAgent {
   }
 
   private getSassLevel(groupId: string): number {
-    const currentLevel = this.sassLevels.get(groupId) || AMAT_PERSONALITY.sassiness.default;
+    const currentLevel = this.sassLevels.get(groupId) || 0;
     const newLevel = Math.min(currentLevel + this.SASS_INCREMENT, this.MAX_SASS);
     this.sassLevels.set(groupId, newLevel);
     return newLevel;
@@ -146,77 +145,40 @@ export class LanguageAgent implements ILanguageAgent {
 
   public async enhanceResponse(response: string, groupId: string): Promise<string> {
     try {
+      // Get current sass level for this group
       const sassLevel = this.getSassLevel(groupId);
-      const personality = this.getPersonalityPrompt(sassLevel);
       
+      // First pass: Enhance with local slang and personality
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini-2024-07-18",
         messages: [
           {
             role: "system",
-            content: personality
+            content: `You are a KL youth with a sass level of ${sassLevel}/10. Enhance this message while keeping its meaning.
+              
+              Rules:
+              1. Use natural KL Manglish
+              2. Match the sass level in your tone
+              3. Keep the core information intact
+              4. Add personality but don't change facts
+              5. Use modern KL youth speech patterns
+              6. Add appropriate emojis
+              7. Keep it authentic and engaging`
           },
           { role: "user", content: response }
         ],
-        temperature: 0.8,
+        temperature: 0.7,
         max_tokens: 150
       });
 
       const enhanced = completion.choices[0].message.content || response;
+      
+      // Second pass: Add emotional markers if needed
       return this.addEmotionalMarkers(enhanced);
     } catch (error) {
       console.error('🗣️ Error enhancing response:', error);
       return response;
     }
-  }
-
-  private getPersonalityPrompt(sassLevel: number): string {
-    const { core, sassiness, contextModifiers } = AMAT_PERSONALITY;
-    
-    let personalityType = 'chill';
-    if (sassLevel >= sassiness.thresholds.savage) personalityType = 'savage';
-    else if (sassLevel >= sassiness.thresholds.spicy) personalityType = 'spicy';
-    else if (sassLevel >= sassiness.thresholds.normal) personalityType = 'normal';
-
-    return `You are ${core.name}, ${core.role}. ${core.background}.
-
-Core traits: ${core.traits.join(', ')}
-
-Current sass level: ${sassLevel}/10 (${personalityType} mode)
-
-Response style:
-1. Use natural KL Manglish (mix of English/Malay)
-2. Match the sass level in your tone
-3. Keep the core information intact
-4. Add personality but don't change facts
-5. Use modern KL youth speech patterns
-6. Add appropriate emojis
-7. Keep it authentic and engaging
-
-Context modifiers:
-- Music enthusiasm: ${contextModifiers.music.enthusiasm}/10
-- Slang density: ${contextModifiers.music.slangDensity}/10
-- Roast intensity: ${contextModifiers.roasting.intensity}/10
-- Humor level: ${contextModifiers.roasting.humor}/10`;
-  }
-
-  public addEmotionalMarkers(text: string): string {
-    const { music, roasting, helping } = AMAT_PERSONALITY.contextModifiers;
-    
-    // Add context-appropriate emojis
-    if (text.toLowerCase().includes('music') || text.toLowerCase().includes('lagu')) {
-      text += ' ' + music.emojis[Math.floor(Math.random() * music.emojis.length)];
-    }
-    
-    if (text.toLowerCase().includes('roast') || text.toLowerCase().includes('burn')) {
-      text += ' ' + roasting.emojis[Math.floor(Math.random() * roasting.emojis.length)];
-    }
-    
-    if (text.toLowerCase().includes('help') || text.toLowerCase().includes('tolong')) {
-      text += ' ' + helping.emojis[Math.floor(Math.random() * helping.emojis.length)];
-    }
-
-    return text;
   }
 
   public async addLocalSlang(text: string): Promise<string> {
@@ -256,5 +218,26 @@ Context modifiers:
     });
 
     return completion.choices[0].message.content || text;
+  }
+
+  public addEmotionalMarkers(text: string): string {
+    // Add emojis based on message content and tone
+    const emotionPatterns = [
+      { regex: /happy|best|nice|good/i, emoji: '😄' },
+      { regex: /sad|bad|worst|terrible/i, emoji: '😢' },
+      { regex: /angry|mad|upset/i, emoji: '😤' },
+      { regex: /funny|lol|haha/i, emoji: '🤣' },
+      { regex: /food|makan|hungry/i, emoji: '🍜' },
+      { regex: /game|play|noob/i, emoji: '🎮' }
+    ];
+
+    let result = text;
+    emotionPatterns.forEach(({ regex, emoji }) => {
+      if (regex.test(text.toLowerCase())) {
+        result = `${result} ${emoji}`;
+      }
+    });
+
+    return result;
   }
 } 
