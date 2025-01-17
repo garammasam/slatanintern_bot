@@ -309,7 +309,15 @@ export class MessageAgent implements IMessageAgent {
               4. Use appropriate KL Manglish
               5. Match the tone of the original query
               6. Keep it authentic and engaging
-              7. Don't make up any information not in the original response`
+              7. Don't make up any information not in the original response
+              8. Use HTML tags for formatting:
+                 - <b>text</b> for bold
+                 - <i>text</i> for italic
+                 - <u>text</u> for underline
+                 - <code>text</code> for monospace
+                 - <pre>text</pre> for preformatted text
+              9. Use bold for important numbers and artist names
+              10. Use italic for emphasis and additional context`
           },
           {
             role: "user",
@@ -317,7 +325,7 @@ export class MessageAgent implements IMessageAgent {
           }
         ],
         temperature: 0.7,
-        max_tokens: 250
+        max_tokens: 800
       });
 
       return enhancedCompletion.choices[0].message.content || response;

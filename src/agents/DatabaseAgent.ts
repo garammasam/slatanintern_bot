@@ -502,7 +502,13 @@ export class DatabaseAgent implements IDatabaseAgent {
             7. Mention top artists by release count
             8. Create hype about upcoming releases/shows
             9. Be precise with numbers
-            10. If unsure about any stats, say so`
+            10. If unsure about any stats, say so
+            11. Use HTML tags for formatting:
+                - <b>text</b> for bold
+                - <i>text</i> for italic
+                - <u>text</u> for underline
+                - <code>text</code> for monospace
+                - <pre>text</pre> for preformatted text`
           },
           {
             role: "user",
@@ -510,7 +516,7 @@ export class DatabaseAgent implements IDatabaseAgent {
           }
         ],
         temperature: 0.7,
-        max_tokens: 350
+        max_tokens: 800
       });
 
       return completion.choices[0].message.content || this.formatDefaultLabelResponse(labelInfo);
@@ -522,16 +528,16 @@ export class DatabaseAgent implements IDatabaseAgent {
 
   private formatDefaultLabelResponse(labelInfo: any): string {
     const activeArtistsList = labelInfo.activeArtists
-      .map((artist: { name: string; releases: number }) => `${artist.name} (${artist.releases} releases)`)
+      .map((artist: { name: string; releases: number }) => `<b>${artist.name}</b> (<i>${artist.releases} releases</i>)`)
       .join('\n- ');
 
-    return `SLATAN Label Stats:
-- ${labelInfo.artistCount} Artists in roster
-- ${labelInfo.totalReleases} Total Releases
-- ${labelInfo.shows.length} Upcoming Shows
-- ${labelInfo.projects.length} Active Projects
+    return `<b>SLATAN Label Stats:</b>
+- <b>${labelInfo.artistCount}</b> Artists in roster
+- <b>${labelInfo.totalReleases}</b> Total Releases
+- <b>${labelInfo.shows.length}</b> Upcoming Shows
+- <b>${labelInfo.projects.length}</b> Active Projects
 
-Active Artists:
+<b>Active Artists:</b>
 - ${activeArtistsList}`;
   }
 
