@@ -2,8 +2,9 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { IDatabaseAgent, Show, Project, ProjectTrack, ArtistInfo } from '../types';
 
 interface SearchQuery {
-  type: 'ARTIST' | 'SONG' | 'SHOW';
+  type: 'ARTIST' | 'SONG' | 'SHOW' | 'PROJECT';
   query: string;
+  isUpcoming: boolean;
 }
 
 export class DatabaseAgent implements IDatabaseAgent {
@@ -11,6 +12,8 @@ export class DatabaseAgent implements IDatabaseAgent {
   private readonly COMMON_PREFIXES = ['apa', 'mana', 'bila', 'kenapa', 'siapa'];
   private readonly MUSIC_KEYWORDS = ['lagu', 'song', 'release', 'album', 'single', 'track'];
   private readonly SHOW_KEYWORDS = ['show', 'gig', 'concert', 'perform'];
+  private readonly PROJECT_KEYWORDS = ['project', 'upcoming project', 'collab'];
+  private readonly UPCOMING_KEYWORDS = ['upcoming', 'coming', 'next'];
 
   constructor() {
     console.log('💾 DatabaseAgent: Initializing...');
@@ -37,7 +40,6 @@ export class DatabaseAgent implements IDatabaseAgent {
   }
 
   private parseQuery(text: string): SearchQuery {
-    // Remove bot mention and clean up text
     let normalizedText = text.toLowerCase()
       .replace(/@\w+/g, '')  // Remove bot mentions
       .trim();
@@ -47,31 +49,48 @@ export class DatabaseAgent implements IDatabaseAgent {
       normalizedText = normalizedText.replace(new RegExp(`^${prefix}\\s+`), '');
     });
 
+    // Check for upcoming shows/projects first
+    const isUpcoming = this.UPCOMING_KEYWORDS.some(keyword => normalizedText.includes(keyword));
+    
     // Extract the main query and determine type
     const words = normalizedText.split(' ');
     let type: SearchQuery['type'] = 'ARTIST';
     let queryWords: string[] = [];
+    let foundKeyword = false;
 
     for (let i = 0; i < words.length; i++) {
       const word = words[i];
       
-      // Check for music-related keywords
-      if (this.MUSIC_KEYWORDS.includes(word)) {
-        type = 'SONG';
-        // Take the words after the keyword
+      // Check for project keywords
+      if (this.PROJECT_KEYWORDS.some(keyword => normalizedText.includes(keyword))) {
+        type = 'PROJECT';
+        // Take the remaining words as the query
         queryWords = words.slice(i + 1);
+        foundKeyword = true;
         break;
       }
       
-      // Check for show-related keywords
-      if (this.SHOW_KEYWORDS.includes(word)) {
+      // Check for show keywords
+      if (this.SHOW_KEYWORDS.some(keyword => word.includes(keyword))) {
         type = 'SHOW';
-        // Take the words after the keyword
+        // Take the remaining words as the query
         queryWords = words.slice(i + 1);
+        foundKeyword = true;
+        break;
+      }
+      
+      // Check for music keywords
+      if (this.MUSIC_KEYWORDS.some(keyword => word.includes(keyword))) {
+        type = 'SONG';
+        // Take the remaining words as the query
+        queryWords = words.slice(i + 1);
+        foundKeyword = true;
         break;
       }
 
-      queryWords.push(word);
+      if (!foundKeyword) {
+        queryWords.push(word);
+      }
     }
 
     // Clean up query
@@ -82,7 +101,8 @@ export class DatabaseAgent implements IDatabaseAgent {
 
     return {
       type,
-      query: query
+      query: query,
+      isUpcoming
     };
   }
 
@@ -119,43 +139,120 @@ export class DatabaseAgent implements IDatabaseAgent {
   }
 
   private async searchArtist(query: string): Promise<any> {
-    // Try exact match with both cases
-    const { data: upperMatches, error: upperError } = await this.supabase
-      .from('catalogs')
-      .select()
-      .filter('artist', 'cs', `{"${query.toUpperCase()}"}`);
+    // Try all possible case variations
+    const queries = [
+      query.toLowerCase(),  // all lowercase
+      query.toUpperCase(),  // all uppercase
+      query,               // original case
+      query.charAt(0).toUpperCase() + query.slice(1).toLowerCase(), // Proper case
+      ...query.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()) // Handle multi-word names
+    ];
 
-    const { data: lowerMatches, error: lowerError } = await this.supabase
-      .from('catalogs')
-      .select()
-      .filter('artist', 'cs', `{"${query.toLowerCase()}"}`);
+    let allMatches: any[] = [];
+    
+    for (const q of queries) {
+      const { data, error } = await this.supabase
+        .from('catalogs')
+        .select()
+        .filter('artist', 'cs', `{"${q}"}`);
 
-    if (upperError || lowerError) {
-      console.error('❌ DatabaseAgent: Error searching catalogs:', upperError || lowerError);
-      return null;
+      if (error) {
+        console.error(`❌ DatabaseAgent: Error searching catalogs for "${q}":`, error);
+        continue;
+      }
+
+      if (data) {
+        allMatches = [...allMatches, ...data];
+      }
     }
 
-    // Combine and sort results
-    const allMatches = [...(upperMatches || []), ...(lowerMatches || [])];
-    return allMatches.sort((a, b) => 
-      new Date(b.release_date).getTime() - new Date(a.release_date).getTime()
-    );
+    // Remove duplicates and sort by date
+    return Array.from(new Set(allMatches.map(m => JSON.stringify(m))))
+      .map(s => JSON.parse(s))
+      .sort((a, b) => new Date(b.release_date).getTime() - new Date(a.release_date).getTime());
   }
 
-  private async searchSong(query: string): Promise<any> {
-    // Try both cases for title search
-    const { data: matches, error: matchError } = await this.supabase
-      .from('catalogs')
-      .select()
-      .or(`title.ilike.%${query}%,title.ilike.%${query.toUpperCase()}%`);
+  private async searchShows(query: string, upcomingOnly: boolean = true): Promise<any> {
+    // Try all possible case variations
+    const queries = [
+      query.toLowerCase(),  // all lowercase
+      query.toUpperCase(),  // all uppercase
+      query,               // original case
+      query.charAt(0).toUpperCase() + query.slice(1).toLowerCase(), // Proper case
+      ...query.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()) // Handle multi-word names
+    ];
 
-    if (matchError) {
-      console.error('❌ DatabaseAgent: Error searching songs:', matchError);
-      return null;
+    let allShows: any[] = [];
+    
+    for (const q of queries) {
+      const { data, error } = await this.supabase
+        .from('shows')
+        .select()
+        .filter('artists', 'cs', `{"${q}"}`);
+
+      if (error) {
+        console.error(`❌ DatabaseAgent: Error searching shows for "${q}":`, error);
+        continue;
+      }
+
+      if (data) {
+        allShows = [...allShows, ...data];
+      }
     }
 
-    return matches?.sort((a, b) => 
-      new Date(b.release_date).getTime() - new Date(a.release_date).getTime()
+    // Filter upcoming shows if requested
+    if (upcomingOnly) {
+      allShows = allShows.filter(show => 
+        new Date(show.date).getTime() > new Date().getTime()
+      );
+    }
+
+    // Remove duplicates and sort by date
+    return Array.from(new Set(allShows.map(s => JSON.stringify(s))))
+      .map(s => JSON.parse(s))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }
+
+  private async searchProjects(query: string, upcomingOnly: boolean = true): Promise<any> {
+    const { data: allProjects, error } = await this.supabase
+      .from('projects')
+      .select('*');
+
+    if (error) {
+      console.error('❌ DatabaseAgent: Error searching projects:', error);
+      return [];
+    }
+
+    // Try all possible case variations for comparison
+    const queries = [
+      query.toLowerCase(),  // all lowercase
+      query.toUpperCase(),  // all uppercase
+      query,               // original case
+      query.charAt(0).toUpperCase() + query.slice(1).toLowerCase(), // Proper case
+      ...query.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()) // Handle multi-word names
+    ];
+
+    // Filter projects where artist appears in any capacity
+    let projects = allProjects.filter(project => {
+      return queries.some(q => {
+        const isMainArtist = project.artist === q;
+        const isCollaborator = project.collaborators.some((c: string) => c === q);
+        const isFeatureArtist = project.tracks.some((track: ProjectTrack) => 
+          track.features?.some((f: string) => f === q)
+        );
+        return isMainArtist || isCollaborator || isFeatureArtist;
+      });
+    });
+
+    // Filter for upcoming projects if requested
+    if (upcomingOnly) {
+      projects = projects.filter(project => 
+        project.status === 'upcoming' || project.status === 'in_progress'
+      );
+    }
+
+    return projects.sort((a, b) => 
+      new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
     );
   }
 
@@ -169,9 +266,9 @@ export class DatabaseAgent implements IDatabaseAgent {
 
       switch (parsedQuery.type) {
         case 'SONG': {
-          const results = await this.searchSong(parsedQuery.query);
+          const results = await this.searchArtist(parsedQuery.query);
           if (results && results.length > 0) {
-            response = `Songs found:\n${this.formatCatalogResponse(results)}`;
+            response = `Songs by ${parsedQuery.query}:\n${this.formatCatalogResponse(results)}`;
           } else {
             response = 'Eh sori, tak jumpa lagu tu 😅';
           }
@@ -179,16 +276,25 @@ export class DatabaseAgent implements IDatabaseAgent {
         }
         
         case 'SHOW': {
-          // Try both cases for artist search in shows
-          const { data: shows } = await this.supabase
-            .from('shows')
-            .select()
-            .or(`artists.cs.{"${parsedQuery.query.toUpperCase()}"},artists.cs.{"${parsedQuery.query.toLowerCase()}"}`);
-
+          const shows = await this.searchShows(parsedQuery.query, parsedQuery.isUpcoming);
           if (shows && shows.length > 0) {
-            response = `Upcoming shows:\n${this.formatShowResponse(shows)}`;
+            response = `${parsedQuery.isUpcoming ? 'Upcoming' : 'All'} shows for ${parsedQuery.query}:\n${this.formatShowResponse(shows)}`;
           } else {
-            response = 'Takde show coming up la 😅';
+            response = parsedQuery.isUpcoming ? 
+              'Takde show coming up la 😅' : 
+              'Takde show dalam database 😅';
+          }
+          break;
+        }
+
+        case 'PROJECT': {
+          const projects = await this.searchProjects(parsedQuery.query, parsedQuery.isUpcoming);
+          if (projects && projects.length > 0) {
+            response = `${parsedQuery.isUpcoming ? 'Upcoming' : 'All'} projects for ${parsedQuery.query}:\n${this.formatProjectResponse(projects)}`;
+          } else {
+            response = parsedQuery.isUpcoming ?
+              'Takde upcoming project la 😅' :
+              'Takde project dalam database 😅';
           }
           break;
         }
@@ -197,7 +303,7 @@ export class DatabaseAgent implements IDatabaseAgent {
           // Search for artist info
           const results = await this.searchArtist(parsedQuery.query);
           if (results && results.length > 0) {
-            response = `Latest releases:\n${this.formatCatalogResponse(results)}`;
+            response = `Latest releases by ${parsedQuery.query}:\n${this.formatCatalogResponse(results)}`;
           } else {
             response = 'Eh sori, tak jumpa artist tu 😅';
           }

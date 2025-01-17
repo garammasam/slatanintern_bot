@@ -1,4 +1,5 @@
 import { Context } from 'grammy';
+import { Message } from '@grammyjs/types';
 import { 
   IMessageAgent, 
   ICoreAgent, 
@@ -143,7 +144,7 @@ export class MessageAgent implements IMessageAgent {
       // Check if it's an artist-related query
       if (this.isArtistQuery(messageText)) {
         console.log('📨 MessageAgent: Handling artist query');
-        const response = await this.databaseAgent.processArtistQuery(messageText);
+        const response = await this.handleArtistQuery(ctx.message);
         await ctx.reply(response, { reply_to_message_id: ctx.message?.message_id });
         return;
       }
@@ -247,6 +248,32 @@ export class MessageAgent implements IMessageAgent {
       }
     } catch (error) {
       console.error('📨 MessageAgent: Error generating response:', error);
+    }
+  }
+
+  private async handleArtistQuery(message: Message): Promise<string> {
+    try {
+      // Clean up the message text
+      const cleanText = message.text
+        ?.replace(/@\w+/g, '')  // Remove bot mentions
+        .trim() || '';
+
+      // Process the query through DatabaseAgent
+      const response = await this.databaseAgent.processArtistQuery(cleanText);
+      
+      // Add a friendly prefix based on the query type
+      if (cleanText.toLowerCase().includes('upcoming')) {
+        return `Here's what I found:\n${response}`;
+      } else if (cleanText.toLowerCase().includes('project')) {
+        return `Let me check the projects:\n${response}`;
+      } else if (cleanText.toLowerCase().includes('show')) {
+        return `Let me check the shows:\n${response}`;
+      } else {
+        return response;
+      }
+    } catch (error) {
+      console.error('❌ MessageAgent: Error handling artist query:', error);
+      return 'Alamak error la pulak. Try again later k? 😅';
     }
   }
 } 

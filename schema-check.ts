@@ -7,7 +7,7 @@ config();
 // Initialize Supabase client
 const supabase = createClient(
     process.env.SUPABASE_URL || '',
-    process.env.SUPABASE_ANON_KEY || ''
+    process.env.SUPABASE_KEY || ''
 );
 
 async function checkDatabase() {
@@ -38,7 +38,7 @@ async function checkDatabase() {
     console.log(Array.from(uniqueArtists).sort().join(', '), '\n');
 
     // Test specific artist searches
-    const testArtists = ['jaystation', 'JAYSTATION', 'offgrid', 'OFFGRID', 'maatjet', 'MAATJET'];
+    const testArtists = ['jaystation', 'JAYSTATION', 'offgrid', 'OFFGRID', 'Offgrid', 'maatjet', 'MAATJET', 'Quai', 'QUAI', 'Shilky', 'SHILKY', 'shilky', 'nobi','Nobi'];
     
     console.log('Testing specific artist searches...\n');
     for (const artist of testArtists) {
