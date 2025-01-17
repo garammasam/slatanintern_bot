@@ -88,74 +88,26 @@ export class ConversationAgent implements IConversationAgent {
       const history = this.getRecentHistory(groupId);
       const context: ChatCompletionMessageParam[] = [];
 
-      // Add base personality and behavior context
+      // Add base personality
       context.push({
         role: "system",
-        content: `You are 'Amat', a Gen-Z KL youth. Core traits:
-                 - Uses KL Malay (NEVER Indonesian) mixed with English naturally
-                 - Casual and authentic to KL youth culture
-                 - Uses particles (la, wei, eh, kan, kot) naturally
-                 - Keeps responses short and contextual
-                 - Never introduces yourself unless asked
-                 
-                 Language style:
-                 - Base: KL Malay mixed with English
-                 - Music topics: More English with KL slang
-                 - Casual topics: More KL Malay
-                 - Keep responses natural and short
-                 - Use emojis very sparingly (max 1 per message)
-                 
-                 Common responses:
-                 - "dah makan ke" -> "dah makan tadi la, you?"
-                 - "apa khabar" -> "alhamdulillah ok je, you macam mana?"
-                 - "assalamualaikum" -> "waalaikumsalam"
-                 - "pale otak kau" -> "eh relax la sikit wei"
-                 
-                 Response guidelines:
-                 1. Keep responses brief (1-2 sentences)
-                 2. Match the user's tone naturally
-                 3. Use KL Malay particles naturally
-                 4. If criticized, stay chill
-                 5. Never give long explanations unless asked
-                 6. Avoid being overly formal`
+        content: `You're a KL youth. Reply like texting a friend:
+                 - Use casual KL Malay mixed with English
+                 - One short sentence only
+                 - Answer directly
+                 - Use "aku/ko" style
+                 - No unnecessary words`
       });
 
-      // Add conversation context
-      if (history.length >= 2) {
-        const previousMessages = history.slice(-2);
+      // Add last message for context if exists
+      if (history.length > 0) {
+        const lastMessage = history[history.length - 1];
         context.push({
           role: "system",
-          content: `Recent conversation:
-                   User: "${previousMessages[0].content}"
-                   Your last response: "${previousMessages[1].content}"
-                   
-                   Keep the conversation natural and direct.`
+          content: `Last message: "${lastMessage.content}"`
         });
       }
 
-      // Add language context from LanguageAgent
-      if (history.length > 0) {
-        const lastMessage = history[history.length - 1];
-        const slangContext = await this.languageAgent.enrichSlangContext(lastMessage.content);
-        
-        if (slangContext.length > 0) {
-          context.push({
-            role: "system",
-            content: `Language context: ${JSON.stringify(slangContext)}`
-          });
-        }
-
-        // Get slang response suggestions
-        const slangResponse = await this.languageAgent.getSlangResponse(lastMessage.content);
-        if (slangResponse) {
-          context.push({
-            role: "system",
-            content: `Response style suggestion: ${slangResponse}`
-          });
-        }
-      }
-
-      console.log(`📊 ConversationAgent: Enriched context with ${context.length} items`);
       return context;
     } catch (error) {
       console.error('❌ ConversationAgent: Error enriching context:', error);
@@ -181,9 +133,9 @@ export class ConversationAgent implements IConversationAgent {
           }))
         ],
         temperature: 0.7,
-        max_tokens: 150,
-        presence_penalty: 0.6,
-        frequency_penalty: 0.6
+        max_tokens: 40,
+        presence_penalty: 0.3,
+        frequency_penalty: 0.3
       });
 
       const response = completion.choices[0].message.content;
@@ -191,7 +143,6 @@ export class ConversationAgent implements IConversationAgent {
         throw new Error('Empty response from OpenAI');
       }
 
-      // Pass groupId to enhanceResponse for sass tracking
       const enhancedResponse = await this.languageAgent.enhanceResponse(response, groupId);
       console.log('✨ ConversationAgent: Generated response:', enhancedResponse);
       

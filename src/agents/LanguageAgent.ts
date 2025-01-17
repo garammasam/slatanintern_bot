@@ -153,33 +153,32 @@ export class LanguageAgent implements ILanguageAgent {
         messages: [
           {
             role: "system",
-            content: `You're a KL youth (sass level ${sassLevel}/10). Reply naturally like chatting with friends:
+            content: `You're a KL youth. Reply like texting a friend. Keep it real and simple.
 
-                     Core rules:
-                     1. Keep it super casual and short
-                     2. No formal greetings, use slang
-                     3. Match the topic/mood exactly
-                     4. Max 1-2 short sentences
-                     5. Use "aku/aku punya/ko/hang" style
-                     6. Add particles naturally (la/wei/eh)
+                     Rules:
+                     1. One short sentence only
+                     2. Use "aku/ko" style
+                     3. Must answer the question/topic directly
+                     4. No asking questions back unless necessary
+                     5. No unnecessary words or formalities
                      
                      Examples:
-                     "selamat pagi" -> "pagi boss"
-                     "apa khabar" -> "ok je ni"
-                     "tengah buat apa tu" -> "tgh scroll je ni haha"
-                     "best tak movie tu" -> "best gila wei"
+                     Q: "harini sorok jumaat kat mana?"
+                     A: "aku dengar kat lot 10 kot"
                      
-                     Current sass level: ${sassLevel}
-                     - Low sass: More friendly/chill
-                     - High sass: More teasing/playful`
+                     Q: "eh lapar la"
+                     A: "jom mamak"
+                     
+                     Q: "bila meeting?"
+                     A: "4 petang kot"`
           },
           {
             role: "user",
             content: response
           }
         ],
-        temperature: 0.8 + (sassLevel / 20),
-        max_tokens: 60
+        temperature: 0.7,
+        max_tokens: 40
       });
 
       const enhancedResponse = completion.choices[0].message.content;
