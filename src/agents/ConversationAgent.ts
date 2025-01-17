@@ -309,4 +309,29 @@ Additional traits:
       return null;
     }
   }
+
+  public async sendMessage(groupId: string, message: string): Promise<void> {
+    try {
+      const bot = this.coreAgent.getBot();
+      await bot.api.sendMessage(groupId, message, {
+        parse_mode: 'MarkdownV2',
+        disable_web_page_preview: true
+      });
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // If MarkdownV2 fails, try with regular markdown
+      try {
+        const bot = this.coreAgent.getBot();
+        await bot.api.sendMessage(groupId, message, {
+          parse_mode: 'Markdown',
+          disable_web_page_preview: true
+        });
+      } catch (retryError) {
+        console.error('Error sending message with regular markdown:', retryError);
+        // If both markdown modes fail, send as plain text
+        const bot = this.coreAgent.getBot();
+        await bot.api.sendMessage(groupId, message);
+      }
+    }
+  }
 } 

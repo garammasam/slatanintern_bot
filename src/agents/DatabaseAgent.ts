@@ -120,40 +120,48 @@ export class DatabaseAgent implements IDatabaseAgent {
   }
 
   private formatCatalogResponse(catalogs: any[]): string {
-    if (catalogs.length === 0) return '';
+    const totalSongs = catalogs.length;
+    const formattedCatalogs = catalogs.map(catalog => {
+      const title = catalog.title;
+      const artist = Array.isArray(catalog.artist) ? catalog.artist.join(', ') : catalog.artist;
+      const date = new Date(catalog.release_date).toLocaleDateString('en-MY');
+      return `"${title}" by ${artist} (${date})`;
+    }).join('\n');
 
-    return catalogs
-      .map(catalog => {
-        const date = new Date(catalog.release_date).toLocaleDateString('en-MY');
-        const artists = Array.isArray(catalog.artist) ? catalog.artist.join(', ') : catalog.artist;
-        return `${catalog.title} - ${artists} (${date})`;
-      })
-      .join('\n');
+    return `Found ${totalSongs} songs:\n${formattedCatalogs}`;
   }
 
   private formatShowResponse(shows: Show[]): string {
-    if (shows.length === 0) return '';
+    const totalShows = shows.length;
+    const formattedShows = shows.map(show => {
+      const title = show.title;
+      const venue = show.venue;
+      const date = new Date(show.date).toLocaleDateString('en-MY');
+      const artists = Array.isArray(show.artists) ? show.artists.join(', ') : show.artists;
+      return `"${title}" at ${venue} on ${date}\nFeaturing: ${artists}`;
+    }).join('\n\n');
 
-    return shows
-      .filter(show => show.status === 'upcoming')
-      .map(show => {
-        const date = new Date(show.date).toLocaleDateString('en-MY');
-        return `${show.title} at ${show.venue} (${date})`;
-      })
-      .join('\n');
+    return `Found ${totalShows} shows:\n${formattedShows}`;
   }
 
   private formatProjectResponse(projects: Project[]): string {
-    if (projects.length === 0) return '';
+    const totalProjects = projects.length;
+    const formattedProjects = projects.map(project => {
+      const title = project.title;
+      const artist = project.artist;
+      const status = project.status;
+      const genre = project.genre;
+      const collaborators = project.collaborators?.join(', ') || 'None';
+      
+      const trackList = project.tracks.map(track => {
+        const features = track.features?.join(', ') || 'None';
+        return `- "${track.title}" (${track.status}) ft. ${features}`;
+      }).join('\n');
 
-    return projects
-      .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
-      .map(project => {
-        const date = new Date(project.start_date).toLocaleDateString('en-MY');
-        const status = project.status === 'IN_PROGRESS' ? '🎵 In Progress' : '📅 Upcoming';
-        return `${project.title} - ${status} (${date})`;
-      })
-      .join('\n');
+      return `"${title}" by ${artist}\nStatus: ${status}\nGenre: ${genre}\nCollaborators: ${collaborators}\n\nTracks:\n${trackList}`;
+    }).join('\n\n');
+
+    return `Found ${totalProjects} projects:\n${formattedProjects}`;
   }
 
   private async searchArtist(query: string): Promise<any> {
@@ -296,7 +304,9 @@ export class DatabaseAgent implements IDatabaseAgent {
             3. Show excitement about the music
             4. Use appropriate emojis
             5. Keep the total response under 200 words
-            6. Include the total number of songs`
+            6. Include the total number of songs
+            7. Use quotes around song titles
+            8. Include release dates`
           },
           {
             role: "user",
@@ -307,10 +317,11 @@ export class DatabaseAgent implements IDatabaseAgent {
         max_tokens: 250
       });
 
-      return completion.choices[0].message.content || this.formatCatalogResponse(catalogs);
+      const response = completion.choices[0].message.content || this.formatCatalogResponse(catalogs);
+      return this.formatTextWithHTML(response);
     } catch (error) {
       console.error('Error formatting catalog with AI:', error);
-      return this.formatCatalogResponse(catalogs);
+      return this.formatTextWithHTML(this.formatCatalogResponse(catalogs));
     }
   }
 
@@ -338,7 +349,8 @@ export class DatabaseAgent implements IDatabaseAgent {
             5. Keep the total response under 200 words
             6. Include the total number of shows
             7. Highlight venue and date clearly
-            8. If it's upcoming shows, create more hype`
+            8. If it's upcoming shows, create more hype
+            9. Use quotes around show titles`
           },
           {
             role: "user",
@@ -349,10 +361,11 @@ export class DatabaseAgent implements IDatabaseAgent {
         max_tokens: 250
       });
 
-      return completion.choices[0].message.content || this.formatShowResponse(shows);
+      const response = completion.choices[0].message.content || this.formatShowResponse(shows);
+      return this.formatTextWithHTML(response);
     } catch (error) {
       console.error('Error formatting shows with AI:', error);
-      return this.formatShowResponse(shows);
+      return this.formatTextWithHTML(this.formatShowResponse(shows));
     }
   }
 
@@ -386,7 +399,8 @@ export class DatabaseAgent implements IDatabaseAgent {
             6. Include the total number of projects
             7. Highlight collaborations and features
             8. If tracks are in progress, create hype about them
-            9. Use street/modern language for project status`
+            9. Use street/modern language for project status
+            10. Use quotes around project and track titles`
           },
           {
             role: "user",
@@ -397,10 +411,11 @@ export class DatabaseAgent implements IDatabaseAgent {
         max_tokens: 300
       });
 
-      return completion.choices[0].message.content || this.formatProjectResponse(projects);
+      const response = completion.choices[0].message.content || this.formatProjectResponse(projects);
+      return this.formatTextWithHTML(response);
     } catch (error) {
       console.error('Error formatting projects with AI:', error);
-      return this.formatProjectResponse(projects);
+      return this.formatTextWithHTML(this.formatProjectResponse(projects));
     }
   }
 
@@ -467,6 +482,88 @@ export class DatabaseAgent implements IDatabaseAgent {
     }
   }
 
+  public formatTextWithHTML(text: string): string {
+    // Escape special characters for MarkdownV2
+    text = text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+
+    // Format numbers with bold
+    text = text.replace(/\b(\d+)\b/g, '*$1*');
+
+    // Format artist names with bold (case-insensitive)
+    const artists = [
+      'Akkimwaru', 'Gard Wuzgut', 'Jaystation', 'Maatjet', 
+      'Nobi', 'Offgrid', 'Quai', 'Shilky', 'SLATAN'
+    ];
+    artists.forEach(artist => {
+      const escapedArtist = artist.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+      const regex = new RegExp(`\\b${escapedArtist}\\b`, 'gi');
+      text = text.replace(regex, `*${escapedArtist}*`);
+    });
+
+    // Handle dates intelligently
+    const now = new Date();
+    const dateRegex = /\b(\d{1,2})(?:st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b/gi;
+    text = text.replace(dateRegex, (match: string, day: string, month: string, year: string) => {
+      const date = new Date(`${month} ${day}, ${year}`);
+      const formattedDate = `${day} ${month} ${year}`.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+      if (date < now) {
+        // For past dates, remove calendar marking suggestions
+        text = text.replace(/mark your calendars?|save the dates?|don't forget|remember/gi, 'was released on');
+        return `\`${formattedDate}\``;
+      }
+      return `\`${formattedDate}\``;
+    });
+
+    // Format numeric dates
+    text = text.replace(/\b(\d{1,2}\/\d{1,2}\/\d{4})\b/g, (match: string) => {
+      const [day, month, year] = match.split('/').map(Number);
+      const date = new Date(year, month - 1, day);
+      const formattedDate = match.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+      if (date < now) {
+        // For past dates, remove calendar marking suggestions
+        text = text.replace(/mark your calendars?|save the dates?|don't forget|remember/gi, 'was released on');
+      }
+      return `\`${formattedDate}\``;
+    });
+
+    // Format song/show titles in quotes with bold
+    text = text.replace(/"([^"]+)"/g, (match: string, title: string) => {
+      const escapedTitle = title.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+      return `*"${escapedTitle}"*`;
+    });
+
+    // Format emphasis phrases with italic
+    const emphasisPhrases = [
+      'upcoming', 'just dropped', 'new release', 'coming soon',
+      'in progress', 'completed', 'featured', 'dropping', 'releases',
+      'was released', 'has dropped'
+    ];
+    emphasisPhrases.forEach(phrase => {
+      const escapedPhrase = phrase.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+      const regex = new RegExp(`\\b${escapedPhrase}\\b`, 'gi');
+      text = text.replace(regex, `_${escapedPhrase}_`);
+    });
+
+    // Format section headers with bold
+    const headers = [
+      'SLATAN Label Stats:', 'Active Artists:', 'Top releases:', 
+      'Recent releases:', 'Upcoming shows:', 'Projects:', 'Past releases:'
+    ];
+    headers.forEach(header => {
+      const escapedHeader = header.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+      text = text.replace(escapedHeader, `*${escapedHeader}*`);
+    });
+
+    // Clean up any nested or malformed markdown
+    text = text
+      .replace(/\*{2,}/g, '*') // Remove multiple asterisks
+      .replace(/_{2,}/g, '_')   // Remove multiple underscores
+      .replace(/`{2,}/g, '`')   // Remove multiple backticks
+      .replace(/(\*|_|`)(\s*)(\*|_|`)/g, '$2'); // Remove empty formatting
+
+    return text;
+  }
+
   private async formatLabelResponseWithAI(labelInfo: any): Promise<string> {
     try {
       const info = {
@@ -503,12 +600,7 @@ export class DatabaseAgent implements IDatabaseAgent {
             8. Create hype about upcoming releases/shows
             9. Be precise with numbers
             10. If unsure about any stats, say so
-            11. Use HTML tags for formatting:
-                - <b>text</b> for bold
-                - <i>text</i> for italic
-                - <u>text</u> for underline
-                - <code>text</code> for monospace
-                - <pre>text</pre> for preformatted text`
+            11. Use quotes around song titles and project names`
           },
           {
             role: "user",
@@ -519,7 +611,8 @@ export class DatabaseAgent implements IDatabaseAgent {
         max_tokens: 800
       });
 
-      return completion.choices[0].message.content || this.formatDefaultLabelResponse(labelInfo);
+      const response = completion.choices[0].message.content || this.formatDefaultLabelResponse(labelInfo);
+      return this.formatTextWithHTML(response);
     } catch (error) {
       console.error('Error formatting label info with AI:', error);
       return this.formatDefaultLabelResponse(labelInfo);
@@ -527,18 +620,20 @@ export class DatabaseAgent implements IDatabaseAgent {
   }
 
   private formatDefaultLabelResponse(labelInfo: any): string {
-    const activeArtistsList = labelInfo.activeArtists
-      .map((artist: { name: string; releases: number }) => `<b>${artist.name}</b> (<i>${artist.releases} releases</i>)`)
+    const artistsList = labelInfo.activeArtists
+      .map((artist: { name: string; releases: number }) => `${artist.name} (${artist.releases} releases)`)
       .join('\n- ');
 
-    return `<b>SLATAN Label Stats:</b>
-- <b>${labelInfo.artistCount}</b> Artists in roster
-- <b>${labelInfo.totalReleases}</b> Total Releases
-- <b>${labelInfo.shows.length}</b> Upcoming Shows
-- <b>${labelInfo.projects.length}</b> Active Projects
+    const response = `SLATAN Label Stats:
+- ${labelInfo.artistCount} Artists in roster
+- ${labelInfo.totalReleases} Total Releases
+- ${labelInfo.shows.length} Upcoming Shows
+- ${labelInfo.projects.length} Active Projects
 
-<b>Active Artists:</b>
-- ${activeArtistsList}`;
+Active Artists:
+- ${artistsList}`;
+
+    return this.formatTextWithHTML(response);
   }
 
   private isLabelQuery(text: string): boolean {
@@ -611,7 +706,7 @@ export class DatabaseAgent implements IDatabaseAgent {
         }
       }
 
-      return response;
+      return this.formatTextWithHTML(response);
 
     } catch (error) {
       console.error('❌ DatabaseAgent: Error processing artist query:', error);
