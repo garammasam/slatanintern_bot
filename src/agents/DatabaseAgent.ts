@@ -483,52 +483,50 @@ export class DatabaseAgent implements IDatabaseAgent {
   }
 
   public formatTextWithHTML(text: string): string {
-    // Escape special characters for MarkdownV2
-    text = text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+    // First, escape all special characters except those used for formatting
+    text = text.replace(/([_*[\]()~`>#+=|{}.!-])/g, '\\$1');
 
-    // Format numbers with bold
-    text = text.replace(/\b(\d+)\b/g, '*$1*');
+    // Format numbers with bold (single *)
+    text = text.replace(/\\b(\\d+)\\b/g, '*$1*');
 
-    // Format artist names with bold (case-insensitive)
+    // Format artist names with bold
     const artists = [
       'Akkimwaru', 'Gard Wuzgut', 'Jaystation', 'Maatjet', 
       'Nobi', 'Offgrid', 'Quai', 'Shilky', 'SLATAN'
     ];
     artists.forEach(artist => {
-      const escapedArtist = artist.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+      // Escape special characters in artist name
+      const escapedArtist = artist.replace(/([_*[\]()~`>#+=|{}.!-])/g, '\\$1');
       const regex = new RegExp(`\\b${escapedArtist}\\b`, 'gi');
       text = text.replace(regex, `*${escapedArtist}*`);
     });
 
-    // Handle dates intelligently
+    // Handle dates
     const now = new Date();
-    const dateRegex = /\b(\d{1,2})(?:st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b/gi;
-    text = text.replace(dateRegex, (match: string, day: string, month: string, year: string) => {
-      const date = new Date(`${month} ${day}, ${year}`);
-      const formattedDate = `${day} ${month} ${year}`.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+    
+    // Format DD/MM/YYYY dates
+    text = text.replace(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g, (match, d, m, y) => {
+      const date = new Date(y, m - 1, d);
       if (date < now) {
-        // For past dates, remove calendar marking suggestions
-        text = text.replace(/mark your calendars?|save the dates?|don't forget|remember/gi, 'was released on');
-        return `\`${formattedDate}\``;
-      }
-      return `\`${formattedDate}\``;
-    });
-
-    // Format numeric dates
-    text = text.replace(/\b(\d{1,2}\/\d{1,2}\/\d{4})\b/g, (match: string) => {
-      const [day, month, year] = match.split('/').map(Number);
-      const date = new Date(year, month - 1, day);
-      const formattedDate = match.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
-      if (date < now) {
-        // For past dates, remove calendar marking suggestions
         text = text.replace(/mark your calendars?|save the dates?|don't forget|remember/gi, 'was released on');
       }
-      return `\`${formattedDate}\``;
+      return `_${d}\\/${m}\\/${y}_`;
     });
 
-    // Format song/show titles in quotes with bold
-    text = text.replace(/"([^"]+)"/g, (match: string, title: string) => {
-      const escapedTitle = title.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+    // Format written dates
+    text = text.replace(/(\d{1,2})(?:st|nd|rd|th)? (January|February|March|April|May|June|July|August|September|October|November|December) (\d{4})/gi,
+      (match, d, m, y) => {
+        const date = new Date(`${m} ${d}, ${y}`);
+        if (date < now) {
+          text = text.replace(/mark your calendars?|save the dates?|don't forget|remember/gi, 'was released on');
+        }
+        return `_${d} ${m} ${y}_`;
+      }
+    );
+
+    // Format song/show titles with quotes and bold
+    text = text.replace(/"([^"]+)"/g, (match, title) => {
+      const escapedTitle = title.replace(/([_*[\]()~`>#+=|{}.!-])/g, '\\$1');
       return `*"${escapedTitle}"*`;
     });
 
@@ -539,7 +537,7 @@ export class DatabaseAgent implements IDatabaseAgent {
       'was released', 'has dropped'
     ];
     emphasisPhrases.forEach(phrase => {
-      const escapedPhrase = phrase.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+      const escapedPhrase = phrase.replace(/([_*[\]()~`>#+=|{}.!-])/g, '\\$1');
       const regex = new RegExp(`\\b${escapedPhrase}\\b`, 'gi');
       text = text.replace(regex, `_${escapedPhrase}_`);
     });
@@ -550,16 +548,17 @@ export class DatabaseAgent implements IDatabaseAgent {
       'Recent releases:', 'Upcoming shows:', 'Projects:', 'Past releases:'
     ];
     headers.forEach(header => {
-      const escapedHeader = header.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+      const escapedHeader = header.replace(/([_*[\]()~`>#+=|{}.!-])/g, '\\$1');
       text = text.replace(escapedHeader, `*${escapedHeader}*`);
     });
 
     // Clean up any nested or malformed markdown
     text = text
-      .replace(/\*{2,}/g, '*') // Remove multiple asterisks
-      .replace(/_{2,}/g, '_')   // Remove multiple underscores
-      .replace(/`{2,}/g, '`')   // Remove multiple backticks
-      .replace(/(\*|_|`)(\s*)(\*|_|`)/g, '$2'); // Remove empty formatting
+      .replace(/\*{3,}/g, '**')  // Fix multiple asterisks
+      .replace(/_{3,}/g, '__')    // Fix multiple underscores
+      .replace(/([*_])\\s*\1/g, '') // Remove empty formatting
+      .replace(/\\\*/g, '*')      // Fix escaped asterisks inside formatting
+      .replace(/\\_/g, '_');      // Fix escaped underscores inside formatting
 
     return text;
   }

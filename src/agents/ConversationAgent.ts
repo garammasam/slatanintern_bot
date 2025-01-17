@@ -313,25 +313,45 @@ Additional traits:
   public async sendMessage(groupId: string, message: string): Promise<void> {
     try {
       const bot = this.coreAgent.getBot();
-      await bot.api.sendMessage(groupId, message, {
-        parse_mode: 'MarkdownV2',
+      
+      // Try sending with MarkdownV2 first
+      try {
+        await bot.api.sendMessage(groupId, message, {
+          parse_mode: 'MarkdownV2',
+          disable_web_page_preview: true
+        });
+        return;
+      } catch (markdownV2Error) {
+        console.error('Error sending with MarkdownV2:', markdownV2Error);
+      }
+
+      // If MarkdownV2 fails, try with regular Markdown
+      try {
+        // Convert MarkdownV2 escapes to regular Markdown
+        const markdownMessage = message
+          .replace(/\\([_*[\]()~`>#+=|{}.!-])/g, '$1')  // Remove escapes
+          .replace(/\*\*/g, '*');  // Convert double asterisks to single
+
+        await bot.api.sendMessage(groupId, markdownMessage, {
+          parse_mode: 'Markdown',
+          disable_web_page_preview: true
+        });
+        return;
+      } catch (markdownError) {
+        console.error('Error sending with Markdown:', markdownError);
+      }
+
+      // If both markdown modes fail, send as plain text
+      const plainText = message
+        .replace(/[*_`]/g, '')  // Remove formatting characters
+        .replace(/\\([_*[\]()~`>#+=|{}.!-])/g, '$1');  // Remove escapes
+      
+      await bot.api.sendMessage(groupId, plainText, {
         disable_web_page_preview: true
       });
     } catch (error) {
       console.error('Error sending message:', error);
-      // If MarkdownV2 fails, try with regular markdown
-      try {
-        const bot = this.coreAgent.getBot();
-        await bot.api.sendMessage(groupId, message, {
-          parse_mode: 'Markdown',
-          disable_web_page_preview: true
-        });
-      } catch (retryError) {
-        console.error('Error sending message with regular markdown:', retryError);
-        // If both markdown modes fail, send as plain text
-        const bot = this.coreAgent.getBot();
-        await bot.api.sendMessage(groupId, message);
-      }
+      throw error;
     }
   }
 } 
