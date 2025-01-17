@@ -120,6 +120,13 @@ export interface IMessageAgent extends IAgent {
   initialize(): Promise<void>;
   shutdown(): Promise<void>;
   handleMessage(ctx: Context): Promise<void>;
+  new?(
+    coreAgent: ICoreAgent,
+    conversationAgent: IConversationAgent,
+    moderationAgent: IModerationAgent,
+    inquiryAgent: IInquiryAgent,
+    databaseAgent: IDatabaseAgent
+  ): IMessageAgent;
 }
 
 export interface IConversationAgent extends IAgent {

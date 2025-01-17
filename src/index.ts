@@ -137,7 +137,8 @@ async function main() {
       coreAgent,
       conversationAgent,
       moderationAgent,
-      inquiryAgent
+      inquiryAgent,
+      databaseAgent
     );
     await messageAgent.initialize();
 
