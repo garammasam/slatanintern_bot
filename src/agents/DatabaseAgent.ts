@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { IDatabaseAgent, Show, Project, ProjectTrack, ArtistInfo } from '../types';
 import { OpenAI } from 'openai';
+import { PersonalityService } from '../services/PersonalityService';
 
 interface SearchQuery {
   type: 'ARTIST' | 'SONG' | 'SHOW' | 'PROJECT';
@@ -10,6 +11,7 @@ interface SearchQuery {
 
 export class DatabaseAgent implements IDatabaseAgent {
   private supabase: SupabaseClient;
+  private personalityService: PersonalityService;
   private readonly COMMON_PREFIXES = ['apa', 'mana', 'bila', 'kenapa', 'siapa'];
   private readonly MUSIC_KEYWORDS = ['lagu', 'song', 'release', 'album', 'single', 'track'];
   private readonly SHOW_KEYWORDS = ['show', 'gig', 'concert', 'perform'];
@@ -31,6 +33,7 @@ export class DatabaseAgent implements IDatabaseAgent {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY
     });
+    this.personalityService = new PersonalityService();
   }
 
   public async initialize(): Promise<void> {
@@ -292,16 +295,20 @@ export class DatabaseAgent implements IDatabaseAgent {
         release_date: new Date(catalog.release_date).toLocaleDateString('en-MY')
       }));
 
+      const personalityInfo = this.personalityService.getPersonalityInfo();
+      const enthusiasm = this.personalityService.getPersonalityTrait('enthusiasm');
+
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini-2024-07-18",
         messages: [
           {
             role: "system",
-            content: `You are a KL youth who loves the local music scene. Format this catalog info in a fun, engaging way.
+            content: `You are ${personalityInfo.name}, ${personalityInfo.bio}
+            Format this catalog info in your unique style.
             Rules:
             1. Use natural KL Manglish (mix of English/Malay)
             2. Keep it casual but informative
-            3. Show excitement about the music
+            3. Show ${enthusiasm > 0.7 ? 'HIGH' : 'moderate'} excitement about the music
             4. Use appropriate emojis
             5. Keep the total response under 200 words
             6. Include the total number of songs
@@ -317,7 +324,16 @@ export class DatabaseAgent implements IDatabaseAgent {
         max_tokens: 250
       });
 
-      const response = completion.choices[0].message.content || this.formatCatalogResponse(catalogs);
+      let response = completion.choices[0].message.content || this.formatCatalogResponse(catalogs);
+      
+      // Add personality particles
+      response = this.personalityService.addPersonalityParticles(response, 'excitement');
+      
+      // Add catchphrase occasionally
+      if (Math.random() < 0.3) {
+        response = `${this.personalityService.getCatchPhrase()} ${response}`;
+      }
+
       return this.formatTextWithHTML(response);
     } catch (error) {
       console.error('Error formatting catalog with AI:', error);
@@ -335,16 +351,20 @@ export class DatabaseAgent implements IDatabaseAgent {
         status: show.status
       }));
 
+      const personalityInfo = this.personalityService.getPersonalityInfo();
+      const enthusiasm = this.personalityService.getPersonalityTrait('enthusiasm');
+
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini-2024-07-18",
         messages: [
           {
             role: "system",
-            content: `You are a KL youth who loves the local music scene. Format this show info in a fun, engaging way.
+            content: `You are ${personalityInfo.name}, ${personalityInfo.bio}
+            Format this show info in your unique style.
             Rules:
             1. Use natural KL Manglish (mix of English/Malay)
             2. Keep it casual but informative
-            3. Show excitement about the shows
+            3. Show ${enthusiasm > 0.7 ? 'HIGH' : 'moderate'} excitement about the shows
             4. Use appropriate emojis
             5. Keep the total response under 200 words
             6. Include the total number of shows
@@ -361,7 +381,16 @@ export class DatabaseAgent implements IDatabaseAgent {
         max_tokens: 250
       });
 
-      const response = completion.choices[0].message.content || this.formatShowResponse(shows);
+      let response = completion.choices[0].message.content || this.formatShowResponse(shows);
+      
+      // Add personality particles
+      response = this.personalityService.addPersonalityParticles(response, isUpcoming ? 'hype' : 'informative');
+      
+      // Add catchphrase for upcoming shows
+      if (isUpcoming && Math.random() < 0.4) {
+        response = `${this.personalityService.getCatchPhrase()} ${response}`;
+      }
+
       return this.formatTextWithHTML(response);
     } catch (error) {
       console.error('Error formatting shows with AI:', error);
@@ -384,23 +413,26 @@ export class DatabaseAgent implements IDatabaseAgent {
         }))
       }));
 
+      const personalityInfo = this.personalityService.getPersonalityInfo();
+      const enthusiasm = this.personalityService.getPersonalityTrait('enthusiasm');
+
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini-2024-07-18",
         messages: [
           {
             role: "system",
-            content: `You are a KL youth who loves the local music scene. Format this project info in a fun, engaging way.
+            content: `You are ${personalityInfo.name}, ${personalityInfo.bio}
+            Format this project info in your unique style.
             Rules:
             1. Use natural KL Manglish (mix of English/Malay)
             2. Keep it casual but informative
-            3. Show excitement about the projects
+            3. Show ${enthusiasm > 0.7 ? 'HIGH' : 'moderate'} excitement about the projects
             4. Use appropriate emojis
-            5. Keep the total response under 250 words
-            6. Include the total number of projects
+            5. Keep it engaging and fun
+            6. Include project status and genre
             7. Highlight collaborations and features
-            8. If tracks are in progress, create hype about them
-            9. Use street/modern language for project status
-            10. Use quotes around project and track titles`
+            8. If it's upcoming projects, create more hype
+            9. Use quotes around project and track titles`
           },
           {
             role: "user",
@@ -408,10 +440,19 @@ export class DatabaseAgent implements IDatabaseAgent {
           }
         ],
         temperature: 0.7,
-        max_tokens: 300
+        max_tokens: 400
       });
 
-      const response = completion.choices[0].message.content || this.formatProjectResponse(projects);
+      let response = completion.choices[0].message.content || this.formatProjectResponse(projects);
+      
+      // Add personality particles
+      response = this.personalityService.addPersonalityParticles(response, isUpcoming ? 'hype' : 'informative');
+      
+      // Add catchphrase for upcoming projects
+      if (isUpcoming && Math.random() < 0.4) {
+        response = `${this.personalityService.getCatchPhrase()} ${response}`;
+      }
+
       return this.formatTextWithHTML(response);
     } catch (error) {
       console.error('Error formatting projects with AI:', error);
@@ -582,15 +623,19 @@ export class DatabaseAgent implements IDatabaseAgent {
           }))
       };
 
+      const personalityInfo = this.personalityService.getPersonalityInfo();
+      const enthusiasm = this.personalityService.getPersonalityTrait('enthusiasm');
+
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini-2024-07-18",
         messages: [
           {
             role: "system",
-            content: `You are a KL youth who loves the local music scene, especially SLATAN. Format this label info in a fun, engaging way.
+            content: `You are ${personalityInfo.name}, ${personalityInfo.bio}
+            Format this label info in your unique style.
             Rules:
             1. Use natural KL Manglish (mix of English/Malay)
-            2. Show pride and excitement about the label
+            2. Show ${enthusiasm > 0.7 ? 'HIGH' : 'moderate'} pride and excitement about the label
             3. Highlight the scale and diversity of the roster
             4. Use appropriate emojis
             5. Keep it informative but casual
@@ -610,7 +655,14 @@ export class DatabaseAgent implements IDatabaseAgent {
         max_tokens: 800
       });
 
-      const response = completion.choices[0].message.content || this.formatDefaultLabelResponse(labelInfo);
+      let response = completion.choices[0].message.content || this.formatDefaultLabelResponse(labelInfo);
+      
+      // Add personality particles
+      response = this.personalityService.addPersonalityParticles(response, 'pride');
+      
+      // Always add catchphrase for label info
+      response = `${this.personalityService.getCatchPhrase()} ${response}`;
+
       return this.formatTextWithHTML(response);
     } catch (error) {
       console.error('Error formatting label info with AI:', error);

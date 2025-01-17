@@ -201,4 +201,100 @@ export interface IInquiryAgent extends IAgent {
   handleArtistInquiry(query: string): Promise<string>;
   isMerchInquiry(text: string): boolean;
   isSocialInquiry(text: string): boolean;
+}
+
+export interface BotPersonality {
+  name: string;
+  role: string;
+  bio: string;
+  traits: {
+    base: {
+      friendliness: number;
+      sassiness: number;
+      helpfulness: number;
+      enthusiasm: number;
+      formality: number;
+    };
+    situational: {
+      [key: string]: {
+        energy: number;
+        motivation: number;
+        positivity: number;
+      };
+    };
+  };
+  speech: {
+    catchPhrases: string[];
+    greetings: {
+      [key: string]: string[];
+    };
+    responseStarters: {
+      [key: string]: string[];
+    };
+    particles: {
+      [key: string]: string[];
+    };
+  };
+  emotions: {
+    default: {
+      mood: string;
+      energy: number;
+      expressiveness: number;
+    };
+    states: {
+      [key: string]: {
+        mood: string;
+        energy: number;
+        expressiveness: number;
+        triggers: string[];
+      };
+    };
+  };
+  knowledge: {
+    expertise: string[];
+    culturalContext: {
+      [key: string]: string[];
+    };
+    interests: string[];
+  };
+  behavior: {
+    engagement: {
+      randomResponseChance: number;
+      mentionResponseChance: number;
+      inactivityThreshold: number;
+      maxMessagesPerMinute: number;
+    };
+    moderation: {
+      warningStyle: string;
+      kickPollStyle: string;
+      rulesEnforcement: string;
+    };
+    groupDynamics: {
+      newMemberWelcome: boolean;
+      inactivityPrompts: boolean;
+      vibeMatching: boolean;
+      conflictDeescalation: boolean;
+    };
+  };
+}
+
+export type PersonalityTrait = 'friendliness' | 'sassiness' | 'helpfulness' | 'enthusiasm' | 'formality';
+
+export type SpeechPattern = string;
+
+export interface EmotionalState {
+  state: string;
+  config: {
+    mood: string;
+    energy: number;
+    expressiveness: number;
+    triggers?: string[];
+  };
+}
+
+export interface KnowledgeBase {
+  category: string;
+  topics: string[];
+  expertise: boolean;
+  interest: boolean;
 } 

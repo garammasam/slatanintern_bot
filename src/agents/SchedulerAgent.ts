@@ -1,24 +1,27 @@
 import { scheduleJob } from 'node-schedule';
 import { ISchedulerAgent, ICoreAgent, Quote } from '../types';
-import { OpenAI } from 'openai';
+import { PersonalityService } from '../services/PersonalityService';
 
 export class SchedulerAgent implements ISchedulerAgent {
   private coreAgent: ICoreAgent;
-  private openai: OpenAI;
+  private personalityService: PersonalityService;
   private morningJob: any;
   private nightJob: any;
 
   constructor(coreAgent: ICoreAgent) {
+    console.log('⏰ SchedulerAgent: Initializing...');
     this.coreAgent = coreAgent;
-    this.openai = new OpenAI({ apiKey: coreAgent.getConfig().openaiKey });
+    this.personalityService = new PersonalityService();
   }
 
   public async initialize(): Promise<void> {
+    console.log('⏰ SchedulerAgent: Setting up scheduled tasks...');
     this.setupMorningGreeting();
     this.setupNightGreeting();
   }
 
   public async shutdown(): Promise<void> {
+    console.log('⏰ SchedulerAgent: Shutting down...');
     if (this.morningJob) {
       this.morningJob.cancel();
     }
@@ -28,132 +31,123 @@ export class SchedulerAgent implements ISchedulerAgent {
   }
 
   public setupMorningGreeting(): void {
-    // Schedule job for 8 AM Malaysia time (UTC+8)
-    this.morningJob = scheduleJob({ rule: '0 8 * * *', tz: 'Asia/Kuala_Lumpur' }, async () => {
+    // Schedule morning greeting at 8:00 AM Malaysia time
+    this.morningJob = scheduleJob('0 8 * * *', async () => {
       try {
-        console.log('Sending morning greeting...');
         const quote = await this.generateDailyQuote('morning');
-        const greeting = this.formatMorningGreeting(quote);
+        const enthusiasm = this.personalityService.getPersonalityTrait('enthusiasm');
+        const sassiness = this.personalityService.getPersonalityTrait('sassiness');
+        
+        let greeting = '';
+        if (enthusiasm > 0.7) {
+          greeting = "WAKE UP BOZOS! TIME FOR ANOTHER L! 🌅";
+        } else if (sassiness > 0.7) {
+          greeting = "Rise and L! Touch some grass today! 🌞";
+        } else {
+          greeting = "Another day another L! 🌄";
+        }
+
+        const message = this.personalityService.addPersonalityParticles(
+          `${greeting}\n\n${quote.text}\n- ${quote.author}`,
+          'roast'
+        );
 
         // Send to all configured groups
-        const config = this.coreAgent.getConfig();
-        const bot = this.coreAgent.getBot();
-        
-        for (const groupId of config.groupIds) {
+        const groups = this.coreAgent.getConfig().groupIds;
+        for (const groupId of groups) {
           try {
-            await bot.api.sendMessage(groupId, greeting, {
-              disable_web_page_preview: true
-            } as any);
-            console.log(`Morning greeting sent to group ${groupId}`);
+            await this.coreAgent.getBot().api.sendMessage(groupId, message);
           } catch (error) {
             console.error(`Error sending morning greeting to group ${groupId}:`, error);
           }
         }
       } catch (error) {
-        console.error('Error in morning greeting scheduler:', error);
+        console.error('Error in morning greeting job:', error);
       }
     });
-    console.log('Morning greeting scheduler set up for 8 AM MYT');
   }
 
   public setupNightGreeting(): void {
-    // Schedule job for 11 PM Malaysia time (UTC+8)
-    this.nightJob = scheduleJob({ rule: '0 23 * * *', tz: 'Asia/Kuala_Lumpur' }, async () => {
+    // Schedule night greeting at 11:00 PM Malaysia time
+    this.nightJob = scheduleJob('0 23 * * *', async () => {
       try {
-        console.log('Sending night greeting...');
         const quote = await this.generateDailyQuote('night');
-        const greeting = this.formatNightGreeting(quote);
+        const enthusiasm = this.personalityService.getPersonalityTrait('enthusiasm');
+        const sassiness = this.personalityService.getPersonalityTrait('sassiness');
+        
+        let greeting = '';
+        if (enthusiasm > 0.7) {
+          greeting = "YO GANG! TIME TO SLEEP ON THEM Ls! 🌙";
+        } else if (sassiness > 0.7) {
+          greeting = "Go to bed! Touch grass tomorrow! 😴";
+        } else {
+          greeting = "Time to rest those L rizz skills! 🌙";
+        }
+
+        const message = this.personalityService.addPersonalityParticles(
+          `${greeting}\n\n${quote.text}\n- ${quote.author}`,
+          'roast'
+        );
 
         // Send to all configured groups
-        const config = this.coreAgent.getConfig();
-        const bot = this.coreAgent.getBot();
-        
-        for (const groupId of config.groupIds) {
+        const groups = this.coreAgent.getConfig().groupIds;
+        for (const groupId of groups) {
           try {
-            await bot.api.sendMessage(groupId, greeting, {
-              disable_web_page_preview: true
-            } as any);
-            console.log(`Night greeting sent to group ${groupId}`);
+            await this.coreAgent.getBot().api.sendMessage(groupId, message);
           } catch (error) {
             console.error(`Error sending night greeting to group ${groupId}:`, error);
           }
         }
       } catch (error) {
-        console.error('Error in night greeting scheduler:', error);
+        console.error('Error in night greeting job:', error);
       }
     });
-    console.log('Night greeting scheduler set up for 11 PM MYT');
   }
 
   public async generateDailyQuote(type: 'morning' | 'night'): Promise<Quote> {
-    try {
-      const prompt = type === 'morning' 
-        ? "Generate a motivational quote in Malay (mix with some English words) about starting the day, hustling, and chasing dreams. The quote should be in SLATAN's style - street smart, music-focused, and inspiring for young artists. Keep it under 15 words."
-        : "Generate a reflective quote in Malay (mix with some English words) about resting, recharging, and preparing for tomorrow's grind. The quote should be in SLATAN's style - street smart, music-focused, and inspiring for young artists. Keep it under 15 words.";
+    const enthusiasm = this.personalityService.getPersonalityTrait('enthusiasm');
+    const sassiness = this.personalityService.getPersonalityTrait('sassiness');
+    const personalityInfo = this.personalityService.getPersonalityInfo();
 
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini-2024-07-18",
-        messages: [
-          {
-            role: "system",
-            content: "You are SLATAN, a Malaysian music collective known for street-smart wisdom and inspiring young artists. Generate a quote that reflects your style - mixing Malay and English naturally, using music metaphors, and keeping it real."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        temperature: 0.9,
-        max_tokens: 100
-      });
-
-      const quote = completion.choices[0].message.content?.trim() || '';
-      return {
-        text: quote,
-        author: "SLATAN"
-      };
-    } catch (error) {
-      console.error(`Error generating ${type} quote:`, error);
-      // Fallback quotes if API fails
-      return type === 'morning'
-        ? { text: "Every day is a new track waiting to be made", author: "SLATAN" }
-        : { text: "Rest up and recharge for tomorrow's session", author: "SLATAN" };
-    }
-  }
-
-  private formatMorningGreeting(quote: Quote): string {
-    const modernGreetings = [
-      "Assalamualaikum everyone! Rise and shine! 🌞",
-      "Morning check! Time to secure the bag! ⭐️",
-      "Yo demo! Let's get this bread! 🌞",
-      "Good morning gang! Time to level up! 🌄",
-      "Rise and grind fr fr! 🌅",
-      "Another day to slay! Let's go! ⭐️"
+    // Select quotes based on time of day and personality
+    const morningQuotes: Quote[] = [
+      {
+        text: "Rise and grind? More like rise and find another L! 💀",
+        author: "Savage Amat"
+      },
+      {
+        text: "New day, new opportunities to catch these Ls! Keep that same energy!",
+        author: "Motivational Amat"
+      },
+      {
+        text: "Imagine sleeping in when you could be catching Ls! Couldn't be me fr fr!",
+        author: "Grindset Amat"
+      }
     ];
 
-    const greeting = modernGreetings[Math.floor(Math.random() * modernGreetings.length)];
-    return `${greeting}\n\nQuote of the day:\n\n"${this.escapeMarkdown(quote.text)}"\n- ${this.escapeMarkdown(quote.author)}\n\nLet's make today count! 💪 No cap, we going crazy! 🔥`;
-  }
-
-  private formatNightGreeting(quote: Quote): string {
-    const modernNightGreetings = [
-      "Assalamualaikum! Time to wrap up the day! 🌙",
-      "Aight gang, let's call it a day! 💤",
-      "Demo semua! Time to recharge fr fr! 😴",
-      "Day's been real, time to reset! ✨",
-      "Alhamdulillah for today's W's! 🌙",
-      "Closing time check! Rest up gang! 💫"
+    const nightQuotes: Quote[] = [
+      {
+        text: "Sleep is just a temporary escape from your Ls! See you tomorrow! 💀",
+        author: "Philosophical Amat"
+      },
+      {
+        text: "Today's L is tomorrow's motivation! Keep that same energy!",
+        author: "Reflective Amat"
+      },
+      {
+        text: "Can't take Ls while sleeping! Unless...? 🤔",
+        author: "Night Owl Amat"
+      }
     ];
 
-    const greeting = modernNightGreetings[Math.floor(Math.random() * modernNightGreetings.length)];
-    return `${greeting}\n\nNight thoughts:\n\n"${this.escapeMarkdown(quote.text)}"\n- ${this.escapeMarkdown(quote.author)}\n\nGet that rest fr fr! 💫 Tomorrow we go again! 🔥`;
-  }
+    const quotes = type === 'morning' ? morningQuotes : nightQuotes;
+    const randomIndex = Math.floor(Math.random() * quotes.length);
+    const quote = quotes[randomIndex];
 
-  private escapeMarkdown(text: string): string {
-    return text
-      .replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+    // Add personality to the quote
+    return {
+      text: this.personalityService.addPersonalityParticles(quote.text, 'roast'),
+      author: enthusiasm > 0.7 ? `${quote.author} 💀` : quote.author
+    };
   }
 } 
