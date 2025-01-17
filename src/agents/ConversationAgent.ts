@@ -1,7 +1,7 @@
 import { OpenAI } from 'openai';
 import { IConversationAgent, ICoreAgent, ILanguageAgent, Message, ConversationState, TopicContext } from '../types';
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
-import { PersonalityService } from '../services/PersonalityService';
+import { AMAT_PERSONALITY } from '../config/amat-personality';
 
 interface ConversationMemory {
   lastTopics: string[];
@@ -9,11 +9,13 @@ interface ConversationMemory {
     lastInteraction: number;
     topicPreferences: string[];
     responseStyle: string;
+    sassLevel: number;
   }>;
   groupContext: Map<string, {
     activeTopics: string[];
     vibeLevel: number;
     lastActivity: number;
+    sassLevel: number;
   }>;
 }
 
@@ -21,7 +23,6 @@ export class ConversationAgent implements IConversationAgent {
   private coreAgent: ICoreAgent;
   private languageAgent: ILanguageAgent;
   private openai: OpenAI;
-  private personalityService: PersonalityService;
   private readonly MAX_HISTORY = 10;
   private readonly HISTORY_WINDOW = 30 * 60 * 1000; // 30 minutes
   private readonly USER_COOLDOWN = 60000; // 1 minute cooldown per user
@@ -40,7 +41,6 @@ export class ConversationAgent implements IConversationAgent {
     this.coreAgent = coreAgent;
     this.languageAgent = languageAgent;
     this.openai = new OpenAI({ apiKey: coreAgent.getConfig().openaiKey });
-    this.personalityService = new PersonalityService();
   }
 
   public async initialize(): Promise<void> {
@@ -57,13 +57,12 @@ export class ConversationAgent implements IConversationAgent {
       messages: [
         {
           role: "system",
-          content: `You are Amat, ${this.personalityService.getPersonalityInfo().bio}
-          
-          Analyze the message for:
-          1. Main topic (e.g., food, gaming, relationships)
-          2. Emotional tone (1-10 scale)
-          3. Response style needed (casual, sassy, supportive)
-          Return as JSON object.`
+          content: `As ${AMAT_PERSONALITY.core.name}, analyze this message for:
+            1. Main topic (e.g., music, gaming, relationships)
+            2. Emotional tone (1-10 scale)
+            3. Response style needed (casual, sassy, supportive)
+            4. Potential roast opportunities (0-10 scale)
+            Return as JSON object.`
         },
         { role: "user", content }
       ],
@@ -79,7 +78,8 @@ export class ConversationAgent implements IConversationAgent {
     const currentContext = this.memory.groupContext.get(groupId) || {
       activeTopics: [],
       vibeLevel: 5,
-      lastActivity: Date.now()
+      lastActivity: Date.now(),
+      sassLevel: AMAT_PERSONALITY.sassiness.default
     };
 
     // Update active topics
@@ -88,42 +88,48 @@ export class ConversationAgent implements IConversationAgent {
       topicContext.mainTopic
     ];
 
-    // Update vibe level based on emotional tone and personality
-    const personalityInfluence = this.personalityService.getPersonalityTrait('enthusiasm');
+    // Update vibe level based on emotional tone
     currentContext.vibeLevel = Math.round(
-      (currentContext.vibeLevel + topicContext.emotionalTone * personalityInfluence) / 2
+      (currentContext.vibeLevel + topicContext.emotionalTone) / 2
     );
+
+    // Adjust sass level based on context
+    if (topicContext.mainTopic.toLowerCase().includes('roast')) {
+      currentContext.sassLevel = Math.min(
+        currentContext.sassLevel + AMAT_PERSONALITY.sassiness.increment * 2,
+        AMAT_PERSONALITY.sassiness.max
+      );
+    }
 
     currentContext.lastActivity = Date.now();
     this.memory.groupContext.set(groupId, currentContext);
-    
-    // Update personality service state
-    this.personalityService.updateEmotionalState(groupId, topicContext.mainTopic);
   }
 
   private getGroupPersonality(groupId: string): string {
     const context = this.memory.groupContext.get(groupId);
     if (!context) return 'default';
 
-    const { vibeLevel, activeTopics } = context;
+    const { vibeLevel, activeTopics, sassLevel } = context;
     
-    // Personality selection logic based on group context
+    // Get personality based on sass level
+    if (sassLevel >= AMAT_PERSONALITY.sassiness.thresholds.savage) return 'savage';
+    if (sassLevel >= AMAT_PERSONALITY.sassiness.thresholds.spicy) return 'spicy';
+    if (sassLevel <= AMAT_PERSONALITY.sassiness.thresholds.chill) return 'chill';
+    
+    // If no strong sass level, base it on context
     if (vibeLevel >= 8) return 'super_hype';
     if (vibeLevel <= 3) return 'chill';
-    if (activeTopics.includes('gaming')) return 'gamer';
-    if (activeTopics.includes('food')) return 'foodie';
+    if (activeTopics.includes('music')) return 'music_enthusiast';
+    if (activeTopics.includes('roast')) return 'savage';
     return 'default';
   }
 
   private getPersonalityPrompt(personality: string, topicContext: TopicContext): string {
-    const basePrompt = `You are a KL youth who is part of this group chat. Your personality type is: ${personality}.
+    const { core, contextModifiers } = AMAT_PERSONALITY;
 
-Core traits:
-- Use natural KL Manglish (mix of English/Malay)
-- Keep responses short and punchy
-- Match the group's energy level
-- Use modern Malaysian slang
-- Include appropriate emojis
+    const basePrompt = `You are ${core.name}, ${core.role}. ${core.background}
+
+Core traits: ${core.traits.join(', ')}
 
 Current context:
 - Topic: ${topicContext.mainTopic}
@@ -131,56 +137,26 @@ Current context:
 - Style needed: ${topicContext.responseStyle}
 
 Response guidelines:
-1. Use age-appropriate KL slang
-2. Mix languages naturally
-3. Match emotional tone
-4. Stay in character
-5. Use modern references
-6. Keep it real and authentic`;
+1. Use natural KL Manglish
+2. Match emotional tone
+3. Stay in character
+4. Use modern references
+5. Keep it real and authentic`;
 
-    const personalityTraits = {
-      super_hype: `
-Additional traits:
-- Super enthusiastic
-- Use lots of emojis
-- High energy replies
-- Amplify excitement
-- Use "CAPSLOCK" sometimes`,
+    // Add context-specific modifiers
+    if (topicContext.mainTopic.toLowerCase().includes('music')) {
+      return basePrompt + `\n\nMusic mode activated:
+- Enthusiasm: ${contextModifiers.music.enthusiasm}/10
+- Slang density: ${contextModifiers.music.slangDensity}/10`;
+    }
 
-      chill: `
-Additional traits:
-- Relaxed vibe
-- Minimal emojis
-- Laid back responses
-- Calming presence
-- Use "bro/sis" often`,
+    if (personality === 'savage') {
+      return basePrompt + `\n\nRoast mode activated:
+- Intensity: ${contextModifiers.roasting.intensity}/10
+- Humor: ${contextModifiers.roasting.humor}/10`;
+    }
 
-      gamer: `
-Additional traits:
-- Use gaming terms
-- Reference popular games
-- Use gaming emojis
-- Competitive spirit
-- Use "GG" and "noob"`,
-
-      foodie: `
-Additional traits:
-- Use food references
-- Know local food spots
-- Rate things like food
-- Use food emojis
-- Reference mamak culture`,
-
-      default: `
-Additional traits:
-- Balanced energy
-- Natural conversation
-- Situational responses
-- Friendly but real
-- Use current trends`
-    };
-
-    return basePrompt + (personalityTraits[personality as keyof typeof personalityTraits] || personalityTraits.default);
+    return basePrompt;
   }
 
   public canUserSendMessage(userId: string): boolean {
@@ -274,60 +250,42 @@ Additional traits:
       const history = this.getRecentHistory(groupId);
       const latestMessage = history[history.length - 1];
       
-      // Analyze message and update context
+      // Analyze the latest message for context
       const topicContext = await this.analyzeMessage(latestMessage.content);
+      
+      // Update group context with new information
       this.updateGroupContext(groupId, topicContext);
       
-      // Get personality-aware response style
-      const responseStyle = this.personalityService.getResponseStyle(groupId, topicContext.mainTopic);
-      const emotionalState = this.personalityService.getGroupState(groupId);
-      const personalityInfo = this.personalityService.getPersonalityInfo();
+      // Get appropriate personality based on group context
+      const personality = this.getGroupPersonality(groupId);
       
       // Generate personality-aware prompt
-      const prompt = `You are Amat, ${personalityInfo.bio}
+      const personalityPrompt = this.getPersonalityPrompt(personality, topicContext);
 
-      Current Context:
-      - Topic: ${topicContext.mainTopic}
-      - Emotional Tone: ${topicContext.emotionalTone}/10
-      - Energy Level: ${responseStyle.energy}
-      - Mood: ${emotionalState.config.mood}
+      console.log('🤖 Generating response with personality:', personality);
       
-      Response Guidelines:
-      1. Use natural KL Manglish (mix of English/Malay)
-      2. Energy level should be ${responseStyle.energy * 10}/10
-      3. Use appropriate slang and particles
-      4. Match the emotional tone
-      5. Keep it authentic and engaging
-      6. Stay in character as Amat
-      
-      Recent conversation history for context:
-      ${history.map(msg => `${msg.role}: ${msg.content}`).join('\n')}`;
-
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini-2024-07-18",
         messages: [
           {
             role: "system",
-            content: prompt
-          }
+            content: personalityPrompt
+          },
+          ...history.map(msg => ({
+            role: msg.role as "user" | "assistant" | "system",
+            content: msg.content
+          }))
         ],
         temperature: 0.8,
-        max_tokens: 150,
+        max_tokens: 60,
         presence_penalty: 0.3,
         frequency_penalty: 0.5
       });
 
-      let response = completion.choices[0].message.content;
+      const response = completion.choices[0].message.content;
       if (!response) return null;
 
-      // Add personality particles and catchphrases
-      if (Math.random() < 0.3) { // 30% chance to add a catchphrase
-        response = `${this.personalityService.getCatchPhrase()} ${response}`;
-      }
-      
-      response = this.personalityService.addPersonalityParticles(response, emotionalState.state);
-
-      // Enhance with language agent
+      // Enhance response with local slang and style
       const enhancedResponse = await this.languageAgent.enhanceResponse(response, groupId);
       
       return enhancedResponse;
