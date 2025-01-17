@@ -144,12 +144,34 @@ export interface IDatabaseAgent extends IAgent {
   searchArtistInfo(query: string): Promise<any>;
 }
 
+export interface TopicContext {
+  mainTopic: string;
+  emotionalTone: number;
+  responseStyle: string;
+}
+
+export interface ConversationState {
+  lastTopics: string[];
+  userInteractions: Map<string, {
+    lastInteraction: number;
+    topicPreferences: string[];
+    responseStyle: string;
+  }>;
+  groupContext: Map<string, {
+    activeTopics: string[];
+    vibeLevel: number;
+    lastActivity: number;
+  }>;
+}
+
 export interface ILanguageAgent {
   initialize(): Promise<void>;
   shutdown(): Promise<void>;
   enrichSlangContext(message: string): Promise<string[]>;
   getSlangResponse(message: string): Promise<string | null>;
   enhanceResponse(response: string, groupId: string): Promise<string>;
+  addLocalSlang(text: string): Promise<string>;
+  addEmotionalMarkers(text: string): string;
 }
 
 export interface ISchedulerAgent extends IAgent {
