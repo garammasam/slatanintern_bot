@@ -37,8 +37,12 @@ export class DatabaseAgent implements IDatabaseAgent {
   }
 
   private parseQuery(text: string): SearchQuery {
-    // Convert to lowercase and remove common prefixes
-    let normalizedText = text.toLowerCase();
+    // Remove bot mention and clean up text
+    let normalizedText = text.toLowerCase()
+      .replace(/@\w+/g, '')  // Remove bot mentions
+      .trim();
+    
+    // Remove common prefixes
     this.COMMON_PREFIXES.forEach(prefix => {
       normalizedText = normalizedText.replace(new RegExp(`^${prefix}\\s+`), '');
     });
@@ -70,9 +74,15 @@ export class DatabaseAgent implements IDatabaseAgent {
       queryWords.push(word);
     }
 
+    // Clean up query
+    const query = queryWords.join(' ')
+      .replace(/[?!.,]/g, '')  // Remove punctuation
+      .replace(/\s+/g, ' ')    // Normalize spaces
+      .trim();
+
     return {
       type,
-      query: queryWords.join(' ').trim()
+      query: query
     };
   }
 
@@ -80,10 +90,10 @@ export class DatabaseAgent implements IDatabaseAgent {
     if (catalogs.length === 0) return '';
 
     return catalogs
-      .sort((a, b) => new Date(b.release_date).getTime() - new Date(a.release_date).getTime())
       .map(catalog => {
         const date = new Date(catalog.release_date).toLocaleDateString('en-MY');
-        return `${catalog.title} (${date})`;
+        const artists = Array.isArray(catalog.artist) ? catalog.artist.join(', ') : catalog.artist;
+        return `${catalog.title} - ${artists} (${date})`;
       })
       .join('\n');
   }
@@ -109,39 +119,44 @@ export class DatabaseAgent implements IDatabaseAgent {
   }
 
   private async searchArtist(query: string): Promise<any> {
-    const { data: catalogs, error: catalogError } = await this.supabase
+    // Try exact match with both cases
+    const { data: upperMatches, error: upperError } = await this.supabase
       .from('catalogs')
       .select()
-      .textSearch('artist', query, {
-        type: 'websearch',
-        config: 'english'
-      })
-      .order('release_date', { ascending: false });
+      .filter('artist', 'cs', `{"${query.toUpperCase()}"}`);
 
-    if (catalogError) {
-      console.error('❌ DatabaseAgent: Error searching catalogs:', catalogError);
+    const { data: lowerMatches, error: lowerError } = await this.supabase
+      .from('catalogs')
+      .select()
+      .filter('artist', 'cs', `{"${query.toLowerCase()}"}`);
+
+    if (upperError || lowerError) {
+      console.error('❌ DatabaseAgent: Error searching catalogs:', upperError || lowerError);
       return null;
     }
 
-    return catalogs;
+    // Combine and sort results
+    const allMatches = [...(upperMatches || []), ...(lowerMatches || [])];
+    return allMatches.sort((a, b) => 
+      new Date(b.release_date).getTime() - new Date(a.release_date).getTime()
+    );
   }
 
   private async searchSong(query: string): Promise<any> {
-    const { data: catalogs, error: catalogError } = await this.supabase
+    // Try both cases for title search
+    const { data: matches, error: matchError } = await this.supabase
       .from('catalogs')
       .select()
-      .textSearch('title', query, {
-        type: 'websearch',
-        config: 'english'
-      })
-      .order('release_date', { ascending: false });
+      .or(`title.ilike.%${query}%,title.ilike.%${query.toUpperCase()}%`);
 
-    if (catalogError) {
-      console.error('❌ DatabaseAgent: Error searching songs:', catalogError);
+    if (matchError) {
+      console.error('❌ DatabaseAgent: Error searching songs:', matchError);
       return null;
     }
 
-    return catalogs;
+    return matches?.sort((a, b) => 
+      new Date(b.release_date).getTime() - new Date(a.release_date).getTime()
+    );
   }
 
   public async processArtistQuery(text: string): Promise<string> {
@@ -164,11 +179,11 @@ export class DatabaseAgent implements IDatabaseAgent {
         }
         
         case 'SHOW': {
+          // Try both cases for artist search in shows
           const { data: shows } = await this.supabase
             .from('shows')
             .select()
-            .filter('artists', 'cs', `{${parsedQuery.query}}`)
-            .eq('status', 'upcoming');
+            .or(`artists.cs.{"${parsedQuery.query.toUpperCase()}"},artists.cs.{"${parsedQuery.query.toLowerCase()}"}`);
 
           if (shows && shows.length > 0) {
             response = `Upcoming shows:\n${this.formatShowResponse(shows)}`;
