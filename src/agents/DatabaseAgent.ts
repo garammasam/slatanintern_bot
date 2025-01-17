@@ -64,8 +64,11 @@ export class DatabaseAgent implements IDatabaseAgent {
       // Check for project keywords
       if (this.PROJECT_KEYWORDS.some(keyword => normalizedText.includes(keyword))) {
         type = 'PROJECT';
-        // Take the remaining words as the query
-        queryWords = words.slice(i + 1);
+        // Take all remaining words after "project" as the query
+        const projectIndex = words.findIndex(w => w === 'project');
+        if (projectIndex !== -1) {
+          queryWords = words.slice(projectIndex + 1);
+        }
         foundKeyword = true;
         break;
       }
@@ -135,7 +138,12 @@ export class DatabaseAgent implements IDatabaseAgent {
 
     return projects
       .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
-      .map(project => `${project.title} (${project.status})`).join('\n');
+      .map(project => {
+        const date = new Date(project.start_date).toLocaleDateString('en-MY');
+        const status = project.status === 'IN_PROGRESS' ? '🎵 In Progress' : '📅 Upcoming';
+        return `${project.title} - ${status} (${date})`;
+      })
+      .join('\n');
   }
 
   private async searchArtist(query: string): Promise<any> {
@@ -235,10 +243,12 @@ export class DatabaseAgent implements IDatabaseAgent {
     // Filter projects where artist appears in any capacity
     let projects = allProjects.filter(project => {
       return queries.some(q => {
-        const isMainArtist = project.artist === q;
-        const isCollaborator = project.collaborators.some((c: string) => c === q);
+        const isMainArtist = project.artist.toLowerCase() === q.toLowerCase();
+        const isCollaborator = project.collaborators.some((c: string) => 
+          c.toLowerCase() === q.toLowerCase()
+        );
         const isFeatureArtist = project.tracks.some((track: ProjectTrack) => 
-          track.features?.some((f: string) => f === q)
+          track.features?.some((f: string) => f.toLowerCase() === q.toLowerCase())
         );
         return isMainArtist || isCollaborator || isFeatureArtist;
       });
@@ -247,7 +257,7 @@ export class DatabaseAgent implements IDatabaseAgent {
     // Filter for upcoming projects if requested
     if (upcomingOnly) {
       projects = projects.filter(project => 
-        project.status === 'upcoming' || project.status === 'in_progress'
+        project.status === 'IN_PROGRESS' || project.status === 'UPCOMING'
       );
     }
 
