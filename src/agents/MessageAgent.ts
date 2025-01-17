@@ -23,13 +23,13 @@ export class MessageAgent implements IMessageAgent {
     'lagu', 'song', 'release', 'album', 'single',
     'project', 'projek', 'show', 'gig', 'concert',
     'perform', 'track', 'artist', 'musician', 'producer',
-    'collaboration', 'collab', 'feat'
+    'collaboration', 'collab', 'feat', 'label', 'roster'
   ];
 
   // List of known artists to check against
   private readonly KNOWN_ARTISTS = [
-    'jaystation', 'maatjet', 'offgrid', 'slatan', 'gard', 'gard wuzgut', 'wuzgut', 'johnasa', 'shilky', 'nobi', 'quai', 'ameeusement', 'akkimwaru'
-    // Add more artists as needed
+    'jaystation', 'maatjet', 'offgrid', 'slatan', 'gard', 'gard wuzgut', 'wuzgut', 
+    'johnasa', 'shilky', 'nobi', 'quai', 'ameeusement', 'akkimwaru'
   ];
 
   constructor(
@@ -59,6 +59,13 @@ export class MessageAgent implements IMessageAgent {
   private isArtistQuery(text: string): boolean {
     const normalizedText = text.toLowerCase();
     
+    // Special handling for SLATAN label queries
+    if (normalizedText.includes('slatan') && 
+        (/^(?:apa|berapa|total).*(?:lagu|song|artist|release)/.test(normalizedText) ||
+         /label|roster|collective|group/.test(normalizedText))) {
+      return true;
+    }
+    
     // Check if message contains any artist query keywords
     const hasKeyword = this.ARTIST_QUERY_KEYWORDS.some(keyword => 
       normalizedText.includes(keyword)
@@ -74,7 +81,8 @@ export class MessageAgent implements IMessageAgent {
       /^apa (?:lagu|projek|show)/i,
       /^bila (?:lagu|show|concert)/i,
       /^mana (?:show|gig|concert)/i,
-      /^siapa (?:feat|collab)/i
+      /^siapa (?:feat|collab)/i,
+      /^berapa (?:lagu|song|artist|release)/i
     ];
 
     const isQuestion = questionPatterns.some(pattern => 

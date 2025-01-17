@@ -15,6 +15,11 @@ export class DatabaseAgent implements IDatabaseAgent {
   private readonly SHOW_KEYWORDS = ['show', 'gig', 'concert', 'perform'];
   private readonly PROJECT_KEYWORDS = ['project', 'upcoming project', 'collab'];
   private readonly UPCOMING_KEYWORDS = ['upcoming', 'coming', 'next'];
+  private readonly LABEL_KEYWORDS = ['label', 'record label', 'roster', 'collective', 'group', 'camp'];
+  private readonly SLATAN_ARTISTS = [
+    'jaystation', 'maatjet', 'offgrid', 'gard', 'gard wuzgut', 'wuzgut', 
+    'johnasa', 'shilky', 'nobi', 'quai', 'ameeusement', 'akkimwaru'
+  ];
   private openai: OpenAI;
 
   constructor() {
@@ -399,9 +404,124 @@ export class DatabaseAgent implements IDatabaseAgent {
     }
   }
 
+  private async getLabelInfo(query: string): Promise<any> {
+    if (query.toLowerCase() !== 'slatan') return null;
+
+    try {
+      // Get all catalogs for SLATAN artists
+      const allCatalogs = [];
+      for (const artist of this.SLATAN_ARTISTS) {
+        const { data, error } = await this.supabase
+          .from('catalogs')
+          .select('*')
+          .filter('artist', 'cs', `{"${artist}"}`);
+        
+        if (!error && data) {
+          allCatalogs.push(...data);
+        }
+      }
+
+      // Get all shows
+      const { data: shows, error: showError } = await this.supabase
+        .from('shows')
+        .select('*')
+        .filter('status', 'eq', 'upcoming');
+
+      // Get all projects
+      const { data: projects, error: projectError } = await this.supabase
+        .from('projects')
+        .select('*')
+        .filter('status', 'in', '("IN_PROGRESS","UPCOMING")');
+
+      return {
+        catalogs: allCatalogs,
+        shows: shows || [],
+        projects: projects || [],
+        artistCount: this.SLATAN_ARTISTS.length
+      };
+    } catch (error) {
+      console.error('Error getting label info:', error);
+      return null;
+    }
+  }
+
+  private async formatLabelResponseWithAI(labelInfo: any): Promise<string> {
+    try {
+      const info = {
+        artistCount: labelInfo.artistCount,
+        totalSongs: labelInfo.catalogs.length,
+        upcomingShows: labelInfo.shows.length,
+        activeProjects: labelInfo.projects.length,
+        artists: this.SLATAN_ARTISTS,
+        recentReleases: labelInfo.catalogs
+          .sort((a: any, b: any) => new Date(b.release_date).getTime() - new Date(a.release_date).getTime())
+          .slice(0, 5)
+          .map((cat: any) => ({
+            title: cat.title,
+            artist: Array.isArray(cat.artist) ? cat.artist.join(', ') : cat.artist,
+            release_date: new Date(cat.release_date).toLocaleDateString('en-MY')
+          }))
+      };
+
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini-2024-07-18",
+        messages: [
+          {
+            role: "system",
+            content: `You are a KL youth who loves the local music scene, especially SLATAN. Format this label info in a fun, engaging way.
+            Rules:
+            1. Use natural KL Manglish (mix of English/Malay)
+            2. Show pride and excitement about the label
+            3. Highlight the scale and diversity of the roster
+            4. Use appropriate emojis
+            5. Keep it informative but casual
+            6. Include key stats (artist count, total songs, etc)
+            7. Mention recent activity
+            8. Create hype about upcoming releases/shows`
+          },
+          {
+            role: "user",
+            content: `SLATAN Label Info:\n${JSON.stringify(info, null, 2)}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 350
+      });
+
+      return completion.choices[0].message.content || this.formatDefaultLabelResponse(labelInfo);
+    } catch (error) {
+      console.error('Error formatting label info with AI:', error);
+      return this.formatDefaultLabelResponse(labelInfo);
+    }
+  }
+
+  private formatDefaultLabelResponse(labelInfo: any): string {
+    return `SLATAN Label Stats:
+- ${labelInfo.artistCount} Artists
+- ${labelInfo.catalogs.length} Total Releases
+- ${labelInfo.shows.length} Upcoming Shows
+- ${labelInfo.projects.length} Active Projects`;
+  }
+
+  private isLabelQuery(text: string): boolean {
+    const normalizedText = text.toLowerCase();
+    return normalizedText.includes('slatan') && 
+           (this.LABEL_KEYWORDS.some(keyword => normalizedText.includes(keyword)) ||
+            /^(?:apa|berapa|total).*(?:lagu|song|artist|release).*slatan/.test(normalizedText));
+  }
+
   public async processArtistQuery(text: string): Promise<string> {
     try {
       console.log(`🔍 DatabaseAgent: Processing query: "${text}"`);
+      
+      // Check if it's a label query first
+      if (this.isLabelQuery(text)) {
+        const labelInfo = await this.getLabelInfo('slatan');
+        if (labelInfo) {
+          return await this.formatLabelResponseWithAI(labelInfo);
+        }
+      }
+
       const parsedQuery = this.parseQuery(text);
       console.log('Parsed Query:', parsedQuery);
 
