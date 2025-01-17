@@ -54,6 +54,7 @@ export interface Project {
   artist: string;
   status: 'IN_PROGRESS' | 'COMPLETED';
   deadline: string;
+  start_date: string;
   genre: string;
   tracks: ProjectTrack[];
   collaborators: string[];
@@ -138,10 +139,17 @@ export interface IModerationAgent extends IAgent {
   shouldModerateMessage(ctx: Context): Promise<boolean>;
 }
 
+export interface ArtistInfo {
+  catalogs: any[];
+  shows: Show[];
+  projects: Project[];
+}
+
 export interface IDatabaseAgent extends IAgent {
   getUpcomingShows(): Promise<Show[]>;
   getProjects(status?: 'IN_PROGRESS' | 'COMPLETED'): Promise<Project[]>;
   searchArtistInfo(query: string): Promise<any>;
+  processArtistQuery(text: string): Promise<string>;
 }
 
 export interface TopicContext {
