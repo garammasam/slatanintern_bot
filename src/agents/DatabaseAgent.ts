@@ -408,16 +408,30 @@ export class DatabaseAgent implements IDatabaseAgent {
     if (query.toLowerCase() !== 'slatan') return null;
 
     try {
-      // Get all catalogs for SLATAN artists
+      // Get all catalogs for SLATAN artists with proper case handling
       const allCatalogs = [];
+      const artistCounts = new Map<string, number>();
+      
       for (const artist of this.SLATAN_ARTISTS) {
-        const { data, error } = await this.supabase
-          .from('catalogs')
-          .select('*')
-          .filter('artist', 'cs', `{"${artist}"}`);
-        
-        if (!error && data) {
-          allCatalogs.push(...data);
+        // Try different case variations
+        const variations = [
+          artist,
+          artist.toUpperCase(),
+          artist.toLowerCase(),
+          artist.charAt(0).toUpperCase() + artist.slice(1).toLowerCase()
+        ];
+
+        for (const variation of variations) {
+          const { data, error } = await this.supabase
+            .from('catalogs')
+            .select('*')
+            .filter('artist', 'cs', `{"${variation}"}`);
+          
+          if (!error && data && data.length > 0) {
+            allCatalogs.push(...data);
+            artistCounts.set(artist, (artistCounts.get(artist) || 0) + data.length);
+            break; // Found matches, no need to try other variations
+          }
         }
       }
 
@@ -433,11 +447,19 @@ export class DatabaseAgent implements IDatabaseAgent {
         .select('*')
         .filter('status', 'in', '("IN_PROGRESS","UPCOMING")');
 
+      // Get active artists (those with releases)
+      const activeArtists = Array.from(artistCounts.entries())
+        .sort((a, b) => b[1] - a[1]) // Sort by number of releases
+        .map(([artist, count]) => ({ name: artist, releases: count }));
+
       return {
         catalogs: allCatalogs,
         shows: shows || [],
         projects: projects || [],
-        artistCount: this.SLATAN_ARTISTS.length
+        artistCount: this.SLATAN_ARTISTS.length,
+        activeArtists: activeArtists,
+        totalReleases: allCatalogs.length,
+        artistStats: Object.fromEntries(artistCounts)
       };
     } catch (error) {
       console.error('Error getting label info:', error);
@@ -449,10 +471,11 @@ export class DatabaseAgent implements IDatabaseAgent {
     try {
       const info = {
         artistCount: labelInfo.artistCount,
-        totalSongs: labelInfo.catalogs.length,
+        totalReleases: labelInfo.totalReleases,
         upcomingShows: labelInfo.shows.length,
         activeProjects: labelInfo.projects.length,
-        artists: this.SLATAN_ARTISTS,
+        artistStats: labelInfo.artistStats,
+        activeArtists: labelInfo.activeArtists,
         recentReleases: labelInfo.catalogs
           .sort((a: any, b: any) => new Date(b.release_date).getTime() - new Date(a.release_date).getTime())
           .slice(0, 5)
@@ -475,9 +498,11 @@ export class DatabaseAgent implements IDatabaseAgent {
             3. Highlight the scale and diversity of the roster
             4. Use appropriate emojis
             5. Keep it informative but casual
-            6. Include key stats (artist count, total songs, etc)
-            7. Mention recent activity
-            8. Create hype about upcoming releases/shows`
+            6. Include accurate stats (artist count, total releases)
+            7. Mention top artists by release count
+            8. Create hype about upcoming releases/shows
+            9. Be precise with numbers
+            10. If unsure about any stats, say so`
           },
           {
             role: "user",
@@ -496,11 +521,18 @@ export class DatabaseAgent implements IDatabaseAgent {
   }
 
   private formatDefaultLabelResponse(labelInfo: any): string {
+    const activeArtistsList = labelInfo.activeArtists
+      .map((artist: { name: string; releases: number }) => `${artist.name} (${artist.releases} releases)`)
+      .join('\n- ');
+
     return `SLATAN Label Stats:
-- ${labelInfo.artistCount} Artists
-- ${labelInfo.catalogs.length} Total Releases
+- ${labelInfo.artistCount} Artists in roster
+- ${labelInfo.totalReleases} Total Releases
 - ${labelInfo.shows.length} Upcoming Shows
-- ${labelInfo.projects.length} Active Projects`;
+- ${labelInfo.projects.length} Active Projects
+
+Active Artists:
+- ${activeArtistsList}`;
   }
 
   private isLabelQuery(text: string): boolean {
