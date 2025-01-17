@@ -1,5 +1,6 @@
 import { Context } from 'grammy';
 import { Message } from '@grammyjs/types';
+import { OpenAI } from 'openai';
 import { 
   IMessageAgent, 
   ICoreAgent, 
@@ -15,6 +16,7 @@ export class MessageAgent implements IMessageAgent {
   private moderationAgent: IModerationAgent;
   private inquiryAgent: IInquiryAgent;
   private databaseAgent: IDatabaseAgent;
+  private openai: OpenAI;
 
   // Common keywords that indicate artist/music queries
   private readonly ARTIST_QUERY_KEYWORDS = [
@@ -43,6 +45,7 @@ export class MessageAgent implements IMessageAgent {
     this.moderationAgent = moderationAgent;
     this.inquiryAgent = inquiryAgent;
     this.databaseAgent = databaseAgent;
+    this.openai = new OpenAI({ apiKey: coreAgent.getConfig().openaiKey });
   }
 
   public async initialize(): Promise<void> {
@@ -258,19 +261,58 @@ export class MessageAgent implements IMessageAgent {
         ?.replace(/@\w+/g, '')  // Remove bot mentions
         .trim() || '';
 
+      // First, analyze the query intent with OpenAI
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini-2024-07-18",
+        messages: [
+          {
+            role: "system",
+            content: `You are analyzing a query about a Malaysian artist/musician.
+              Determine:
+              1. What specifically they're asking about (songs, shows, projects, etc)
+              2. The tone/urgency of the question
+              3. Any specific timeframe mentioned
+              Return as JSON object.`
+          },
+          { role: "user", content: cleanText }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.3,
+        max_tokens: 150
+      });
+
+      const queryAnalysis = JSON.parse(completion.choices[0].message.content!);
+      
       // Process the query through DatabaseAgent
       const response = await this.databaseAgent.processArtistQuery(cleanText);
       
-      // Add a friendly prefix based on the query type
-      if (cleanText.toLowerCase().includes('upcoming')) {
-        return `Here's what I found:\n${response}`;
-      } else if (cleanText.toLowerCase().includes('project')) {
-        return `Let me check the projects:\n${response}`;
-      } else if (cleanText.toLowerCase().includes('show')) {
-        return `Let me check the shows:\n${response}`;
-      } else {
-        return response;
-      }
+      // Enhance the response with conversational elements
+      const enhancedCompletion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini-2024-07-18",
+        messages: [
+          {
+            role: "system",
+            content: `You are a KL youth who loves the local music scene. Make this database response more conversational and engaging.
+              
+              Rules:
+              1. Keep all the factual information intact
+              2. Add natural conversation starters/endings
+              3. Show genuine interest in the artist
+              4. Use appropriate KL Manglish
+              5. Match the tone of the original query
+              6. Keep it authentic and engaging
+              7. Don't make up any information not in the original response`
+          },
+          {
+            role: "user",
+            content: `Original query: ${cleanText}\nQuery analysis: ${JSON.stringify(queryAnalysis)}\nDatabase response: ${response}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 250
+      });
+
+      return enhancedCompletion.choices[0].message.content || response;
     } catch (error) {
       console.error('❌ MessageAgent: Error handling artist query:', error);
       return 'Alamak error la pulak. Try again later k? 😅';

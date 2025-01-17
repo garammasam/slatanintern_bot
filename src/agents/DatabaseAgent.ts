@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { IDatabaseAgent, Show, Project, ProjectTrack, ArtistInfo } from '../types';
+import { OpenAI } from 'openai';
 
 interface SearchQuery {
   type: 'ARTIST' | 'SONG' | 'SHOW' | 'PROJECT';
@@ -14,6 +15,7 @@ export class DatabaseAgent implements IDatabaseAgent {
   private readonly SHOW_KEYWORDS = ['show', 'gig', 'concert', 'perform'];
   private readonly PROJECT_KEYWORDS = ['project', 'upcoming project', 'collab'];
   private readonly UPCOMING_KEYWORDS = ['upcoming', 'coming', 'next'];
+  private openai: OpenAI;
 
   constructor() {
     console.log('💾 DatabaseAgent: Initializing...');
@@ -21,6 +23,9 @@ export class DatabaseAgent implements IDatabaseAgent {
       process.env.SUPABASE_URL || '',
       process.env.SUPABASE_KEY || ''
     );
+    this.openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    });
   }
 
   public async initialize(): Promise<void> {
@@ -266,6 +271,134 @@ export class DatabaseAgent implements IDatabaseAgent {
     );
   }
 
+  private async formatCatalogResponseWithAI(catalogs: any[], query: string): Promise<string> {
+    try {
+      const catalogInfo = catalogs.map(catalog => ({
+        title: catalog.title,
+        artist: Array.isArray(catalog.artist) ? catalog.artist.join(', ') : catalog.artist,
+        release_date: new Date(catalog.release_date).toLocaleDateString('en-MY')
+      }));
+
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini-2024-07-18",
+        messages: [
+          {
+            role: "system",
+            content: `You are a KL youth who loves the local music scene. Format this catalog info in a fun, engaging way.
+            Rules:
+            1. Use natural KL Manglish (mix of English/Malay)
+            2. Keep it casual but informative
+            3. Show excitement about the music
+            4. Use appropriate emojis
+            5. Keep the total response under 200 words
+            6. Include the total number of songs`
+          },
+          {
+            role: "user",
+            content: `Here are ${catalogInfo.length} songs by ${query}:\n${JSON.stringify(catalogInfo, null, 2)}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 250
+      });
+
+      return completion.choices[0].message.content || this.formatCatalogResponse(catalogs);
+    } catch (error) {
+      console.error('Error formatting catalog with AI:', error);
+      return this.formatCatalogResponse(catalogs);
+    }
+  }
+
+  private async formatShowResponseWithAI(shows: Show[], query: string, isUpcoming: boolean): Promise<string> {
+    try {
+      const showInfo = shows.map(show => ({
+        title: show.title,
+        venue: show.venue,
+        date: new Date(show.date).toLocaleDateString('en-MY'),
+        artists: show.artists,
+        status: show.status
+      }));
+
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini-2024-07-18",
+        messages: [
+          {
+            role: "system",
+            content: `You are a KL youth who loves the local music scene. Format this show info in a fun, engaging way.
+            Rules:
+            1. Use natural KL Manglish (mix of English/Malay)
+            2. Keep it casual but informative
+            3. Show excitement about the shows
+            4. Use appropriate emojis
+            5. Keep the total response under 200 words
+            6. Include the total number of shows
+            7. Highlight venue and date clearly
+            8. If it's upcoming shows, create more hype`
+          },
+          {
+            role: "user",
+            content: `Here are ${showInfo.length} ${isUpcoming ? 'upcoming' : ''} shows ${isUpcoming ? 'featuring' : 'by'} ${query}:\n${JSON.stringify(showInfo, null, 2)}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 250
+      });
+
+      return completion.choices[0].message.content || this.formatShowResponse(shows);
+    } catch (error) {
+      console.error('Error formatting shows with AI:', error);
+      return this.formatShowResponse(shows);
+    }
+  }
+
+  private async formatProjectResponseWithAI(projects: Project[], query: string, isUpcoming: boolean): Promise<string> {
+    try {
+      const projectInfo = projects.map(project => ({
+        title: project.title,
+        artist: project.artist,
+        status: project.status,
+        genre: project.genre,
+        collaborators: project.collaborators,
+        tracks: project.tracks.map(track => ({
+          title: track.title,
+          status: track.status,
+          features: track.features
+        }))
+      }));
+
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini-2024-07-18",
+        messages: [
+          {
+            role: "system",
+            content: `You are a KL youth who loves the local music scene. Format this project info in a fun, engaging way.
+            Rules:
+            1. Use natural KL Manglish (mix of English/Malay)
+            2. Keep it casual but informative
+            3. Show excitement about the projects
+            4. Use appropriate emojis
+            5. Keep the total response under 250 words
+            6. Include the total number of projects
+            7. Highlight collaborations and features
+            8. If tracks are in progress, create hype about them
+            9. Use street/modern language for project status`
+          },
+          {
+            role: "user",
+            content: `Here are ${projectInfo.length} ${isUpcoming ? 'upcoming' : ''} projects ${isUpcoming ? 'featuring' : 'by'} ${query}:\n${JSON.stringify(projectInfo, null, 2)}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 300
+      });
+
+      return completion.choices[0].message.content || this.formatProjectResponse(projects);
+    } catch (error) {
+      console.error('Error formatting projects with AI:', error);
+      return this.formatProjectResponse(projects);
+    }
+  }
+
   public async processArtistQuery(text: string): Promise<string> {
     try {
       console.log(`🔍 DatabaseAgent: Processing query: "${text}"`);
@@ -278,7 +411,7 @@ export class DatabaseAgent implements IDatabaseAgent {
         case 'SONG': {
           const results = await this.searchArtist(parsedQuery.query);
           if (results && results.length > 0) {
-            response = `Songs by ${parsedQuery.query}:\n${this.formatCatalogResponse(results)}`;
+            response = await this.formatCatalogResponseWithAI(results, parsedQuery.query);
           } else {
             response = 'Eh sori, tak jumpa lagu tu 😅';
           }
@@ -288,11 +421,11 @@ export class DatabaseAgent implements IDatabaseAgent {
         case 'SHOW': {
           const shows = await this.searchShows(parsedQuery.query, parsedQuery.isUpcoming);
           if (shows && shows.length > 0) {
-            response = `${parsedQuery.isUpcoming ? 'Upcoming' : 'All'} shows for ${parsedQuery.query}:\n${this.formatShowResponse(shows)}`;
+            response = await this.formatShowResponseWithAI(shows, parsedQuery.query, parsedQuery.isUpcoming);
           } else {
             response = parsedQuery.isUpcoming ? 
-              'Takde show coming up la 😅' : 
-              'Takde show dalam database 😅';
+              'Takde show coming up la 😅 Nanti kalau ada I update you first k!' : 
+              'Takde show dalam database 😅 Check balik later!';
           }
           break;
         }
@@ -300,11 +433,11 @@ export class DatabaseAgent implements IDatabaseAgent {
         case 'PROJECT': {
           const projects = await this.searchProjects(parsedQuery.query, parsedQuery.isUpcoming);
           if (projects && projects.length > 0) {
-            response = `${parsedQuery.isUpcoming ? 'Upcoming' : 'All'} projects for ${parsedQuery.query}:\n${this.formatProjectResponse(projects)}`;
+            response = await this.formatProjectResponseWithAI(projects, parsedQuery.query, parsedQuery.isUpcoming);
           } else {
             response = parsedQuery.isUpcoming ?
-              'Takde upcoming project la 😅' :
-              'Takde project dalam database 😅';
+              'Takde upcoming project la 😅 But stay tuned, confirm ada something cooking! 🔥' :
+              'Takde project dalam database 😅 Check balik later k!';
           }
           break;
         }
@@ -313,9 +446,9 @@ export class DatabaseAgent implements IDatabaseAgent {
           // Search for artist info
           const results = await this.searchArtist(parsedQuery.query);
           if (results && results.length > 0) {
-            response = `Latest releases by ${parsedQuery.query}:\n${this.formatCatalogResponse(results)}`;
+            response = await this.formatCatalogResponseWithAI(results, parsedQuery.query);
           } else {
-            response = 'Eh sori, tak jumpa artist tu 😅';
+            response = 'Eh sori, tak jumpa artist tu 😅 Check ejaan ke? 🤔';
           }
         }
       }

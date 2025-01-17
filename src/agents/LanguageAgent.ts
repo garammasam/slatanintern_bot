@@ -145,13 +145,36 @@ export class LanguageAgent implements ILanguageAgent {
 
   public async enhanceResponse(response: string, groupId: string): Promise<string> {
     try {
-      // First pass: Basic slang enhancement
-      let enhanced = await this.addLocalSlang(response);
+      // Get current sass level for this group
+      const sassLevel = this.getSassLevel(groupId);
       
-      // Second pass: Add emotional markers
-      enhanced = this.addEmotionalMarkers(enhanced);
+      // First pass: Enhance with local slang and personality
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini-2024-07-18",
+        messages: [
+          {
+            role: "system",
+            content: `You are a KL youth with a sass level of ${sassLevel}/10. Enhance this message while keeping its meaning.
+              
+              Rules:
+              1. Use natural KL Manglish
+              2. Match the sass level in your tone
+              3. Keep the core information intact
+              4. Add personality but don't change facts
+              5. Use modern KL youth speech patterns
+              6. Add appropriate emojis
+              7. Keep it authentic and engaging`
+          },
+          { role: "user", content: response }
+        ],
+        temperature: 0.7,
+        max_tokens: 150
+      });
+
+      const enhanced = completion.choices[0].message.content || response;
       
-      return enhanced;
+      // Second pass: Add emotional markers if needed
+      return this.addEmotionalMarkers(enhanced);
     } catch (error) {
       console.error('🗣️ Error enhancing response:', error);
       return response;
@@ -164,18 +187,34 @@ export class LanguageAgent implements ILanguageAgent {
       messages: [
         {
           role: "system",
-          content: `Enhance this message with natural KL slang. Rules:
-            1. Keep the same meaning
-            2. Make it sound more natural/local
-            3. Use appropriate Malaysian particles (la, wei, eh) - but only if they fit naturally
-            4. Mix English and Malay naturally
-            5. Keep it short and authentic
-            6. Don't add particles if message already has them`
+          content: `You are a KL youth who naturally speaks Manglish. Enhance this message with natural KL slang and style.
+            
+            Rules:
+            1. Keep the core meaning intact
+            2. Make it sound like natural KL youth speech
+            3. Use Malaysian particles (la, wei, eh, kan, kot, sia) where they fit naturally
+            4. Mix English and Malay like a real KL youth would
+            5. Keep it authentic and casual
+            6. Don't force slang where it doesn't fit
+            7. Use modern KL references when relevant
+            8. Match the emotional tone of the original message
+            9. Add appropriate emojis but don't overdo it
+            10. Keep the same information but make it more engaging
+
+            Examples:
+            Input: "I don't know what to eat"
+            Output: "Eh tak tau nak makan apa la wei 😩"
+
+            Input: "This song is really good"
+            Output: "Lagu ni confirm padu gila 🔥"
+
+            Input: "I'm tired from working"
+            Output: "Penat gila kerja ni sia 😮‍💨"`
         },
         { role: "user", content: text }
       ],
       temperature: 0.7,
-      max_tokens: 60
+      max_tokens: 100
     });
 
     return completion.choices[0].message.content || text;
