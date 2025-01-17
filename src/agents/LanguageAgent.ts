@@ -9,12 +9,16 @@ export class LanguageAgent implements ILanguageAgent {
 
   // Common KL Malay expressions and their contexts
   private readonly KL_EXPRESSIONS = {
-    agreement: ['betul tu', 'ye lah', 'mmg la', 'dah la tu', 'ok wat'],
-    disagreement: ['mana boleh', 'tak gitu la', 'eh tak la pulak', 'mende la', 'tak kot'],
-    excitement: ['best gila', 'power la', 'gempak', 'mantap', 'terbaik'],
-    skepticism: ['ye ke', 'ish', 'tak caya la', 'eh serious?', 'betul ke ni'],
-    acknowledgment: ['faham2', 'ok ah', 'boleh la', 'takpe2'],
-    common_particles: ['la', 'wei', 'eh', 'kan', 'kot', 'sial', 'bro', 'doh']
+    greetings: {
+      morning: ['pagi boss', 'pagi2', 'morning'],
+      afternoon: ['tgh hari', 'lunch time ni', 'ptg ni'],
+      evening: ['petang dah ni', 'dah petang rupanya'],
+      night: ['malam dah', 'night2']
+    },
+    casual: ['jom', 'ok', 'hmm', 'eh', 'oi', 'weh', 'dey'],
+    acknowledgment: ['ye la tu', 'betul3', 'ok ah', 'boleh la', 'mmg la'],
+    agreement: ['sama la', 'ye doh', 'betul jugak', 'kan?'],
+    questions: ['cemana?', 'apa bikin?', 'ok tak?', 'best ke?']
   };
 
   constructor() {
@@ -83,17 +87,23 @@ export class LanguageAgent implements ILanguageAgent {
         messages: [
           {
             role: "system",
-            content: `You're a KL youth. Suggest a natural response style that:
-                     1. Uses KL Malay slang (NEVER Indonesian)
-                     2. Mixes English naturally when appropriate
-                     3. Keeps it casual and authentic to KL
-                     4. Uses common particles (la, wei, eh, kan, kot)
+            content: `You're chatting with friends in KL style. Keep it real:
+
+                     Rules:
+                     1. Use daily KL chat style
+                     2. Mix Malay/English naturally
+                     3. Keep it super short
+                     4. Match the exact topic/mood
                      
                      Examples:
-                     - "tak boleh la macam tu wei"
-                     - "confirm best gila"
-                     - "eh mende ni actually"
-                     - "ok wat, takpe2"
+                     User: "boring gila hari ni"
+                     Reply: "same la bro"
+                     
+                     User: "eh tengok movie tak semalam"
+                     Reply: "movie apa eh?"
+                     
+                     User: "makan apa best kat area ni"
+                     Reply: "mamak je paling best kot"
                      
                      Return null if no specific style needed.`
           },
@@ -103,7 +113,7 @@ export class LanguageAgent implements ILanguageAgent {
           }
         ],
         temperature: 0.7,
-        max_tokens: 100
+        max_tokens: 50
       });
 
       const response = completion.choices[0].message.content;
@@ -123,7 +133,15 @@ export class LanguageAgent implements ILanguageAgent {
 
   private getRandomExpression(type: keyof typeof this.KL_EXPRESSIONS): string {
     const expressions = this.KL_EXPRESSIONS[type];
-    return expressions[Math.floor(Math.random() * expressions.length)];
+    if (Array.isArray(expressions)) {
+      return expressions[Math.floor(Math.random() * expressions.length)];
+    } else if (type === 'greetings') {
+      const timeKeys = Object.keys(expressions) as Array<keyof typeof expressions>;
+      const randomKey = timeKeys[Math.floor(Math.random() * timeKeys.length)];
+      const timeExpressions = expressions[randomKey];
+      return timeExpressions[Math.floor(Math.random() * timeExpressions.length)];
+    }
+    return '';
   }
 
   public async enhanceResponse(response: string, groupId: string): Promise<string> {
@@ -135,33 +153,33 @@ export class LanguageAgent implements ILanguageAgent {
         messages: [
           {
             role: "system",
-            content: `You're a KL youth with sass level ${sassLevel}/10. Enhance the response:
-                     1. Use KL Malay (NEVER Indonesian) mixed with English
-                     2. Keep original meaning but add KL attitude
-                     3. Use particles naturally (la, wei, eh, kan, kot)
-                     4. Add playful teasing based on sass level
-                     5. Keep it concise and natural
-                     
-                     Sass guidelines by level:
-                     - Level 0-3: "takpe2 la wei" style
-                     - Level 4-6: "eh mende la you ni" style
-                     - Level 7-10: "confirm la noob" style
+            content: `You're a KL youth (sass level ${sassLevel}/10). Reply naturally like chatting with friends:
+
+                     Core rules:
+                     1. Keep it super casual and short
+                     2. No formal greetings, use slang
+                     3. Match the topic/mood exactly
+                     4. Max 1-2 short sentences
+                     5. Use "aku/aku punya/ko/hang" style
+                     6. Add particles naturally (la/wei/eh)
                      
                      Examples:
-                     - "tak boleh la macam tu wei"
-                     - "confirm best gila"
-                     - "eh serious la you?"
-                     - "ok je kot actually"
+                     "selamat pagi" -> "pagi boss"
+                     "apa khabar" -> "ok je ni"
+                     "tengah buat apa tu" -> "tgh scroll je ni haha"
+                     "best tak movie tu" -> "best gila wei"
                      
-                     Current sass level: ${sassLevel}`
+                     Current sass level: ${sassLevel}
+                     - Low sass: More friendly/chill
+                     - High sass: More teasing/playful`
           },
           {
             role: "user",
             content: response
           }
         ],
-        temperature: 0.7 + (sassLevel / 20),
-        max_tokens: 150
+        temperature: 0.8 + (sassLevel / 20),
+        max_tokens: 60
       });
 
       const enhancedResponse = completion.choices[0].message.content;
