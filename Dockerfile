@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -24,6 +25,10 @@ RUN npm run build
 
 # Expose the port the app runs on
 EXPOSE 3000
+
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
 
 # Use tini as init system
 RUN apt-get update && apt-get install -y tini && rm -rf /var/lib/apt/lists/*

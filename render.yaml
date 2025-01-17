@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: slatanintern-bot
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 18.19.0
+      - key: PORT
+        value: 3000
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: ALLOWED_GROUP_IDS
+        sync: false
+      - key: RESPONSE_THRESHOLD
+        value: "0.1"
+      - key: SELF_URL
+        value: https://slatanintern-bot.onrender.com
+    autoDeploy: true 

@@ -8,9 +8,70 @@ import { LanguageAgent } from './agents/LanguageAgent';
 import { SchedulerAgent } from './agents/SchedulerAgent';
 import { InquiryAgent } from './agents/InquiryAgent';
 import { BotConfig } from './types';
+import * as http from 'http';
 
 // Load environment variables
 config();
+
+// Create HTTP server for health checks
+const server = http.createServer((req, res) => {
+  const startTime = Date.now();
+  console.log(`[${new Date().toISOString()}] Received ${req.method} request to ${req.url}`);
+  
+  try {
+    if (req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        status: 'healthy', 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        env: {
+          hasToken: !!process.env.TELEGRAM_TOKEN,
+          hasOpenAI: !!process.env.OPENAI_API_KEY,
+          hasSupabase: !!(process.env.SUPABASE_URL && process.env.SUPABASE_KEY),
+          port: process.env.PORT || 3000
+        }
+      }));
+    } else {
+      // Root endpoint
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        status: 'ok',
+        message: 'Malaysian Group Chat Bot is running',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+      }));
+    }
+    console.log(`[${new Date().toISOString()}] Request completed in ${Date.now() - startTime}ms`);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error handling request:`, error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      status: 'error',
+      message: 'Internal server error',
+      timestamp: new Date().toISOString()
+    }));
+  }
+});
+
+// Start HTTP server
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`[${new Date().toISOString()}] 🌐 HTTP server listening on port ${PORT}`);
+  console.log('Environment check:', {
+    hasToken: !!process.env.TELEGRAM_TOKEN,
+    hasOpenAI: !!process.env.OPENAI_API_KEY,
+    hasSupabase: !!(process.env.SUPABASE_URL && process.env.SUPABASE_KEY),
+    port: PORT
+  });
+});
+
+// Handle server errors
+server.on('error', (error) => {
+  console.error(`[${new Date().toISOString()}] HTTP server error:`, error);
+  process.exit(1); // Exit on server error to allow container restart
+});
 
 async function main() {
   try {
