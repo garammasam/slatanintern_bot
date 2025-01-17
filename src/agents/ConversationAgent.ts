@@ -82,23 +82,28 @@ export class ConversationAgent implements IConversationAgent {
       sassLevel: AMAT_PERSONALITY.sassiness.default
     };
 
-    // Update active topics
-    currentContext.activeTopics = [
-      ...currentContext.activeTopics.slice(-2),
-      topicContext.mainTopic
-    ];
+    // Safely handle undefined topic context
+    if (topicContext && topicContext.mainTopic) {
+      // Update active topics
+      currentContext.activeTopics = [
+        ...currentContext.activeTopics.slice(-2),
+        topicContext.mainTopic
+      ];
 
-    // Update vibe level based on emotional tone
-    currentContext.vibeLevel = Math.round(
-      (currentContext.vibeLevel + topicContext.emotionalTone) / 2
-    );
+      // Update vibe level based on emotional tone
+      if (typeof topicContext.emotionalTone === 'number') {
+        currentContext.vibeLevel = Math.round(
+          (currentContext.vibeLevel + topicContext.emotionalTone) / 2
+        );
+      }
 
-    // Adjust sass level based on context
-    if (topicContext.mainTopic.toLowerCase().includes('roast')) {
-      currentContext.sassLevel = Math.min(
-        currentContext.sassLevel + AMAT_PERSONALITY.sassiness.increment * 2,
-        AMAT_PERSONALITY.sassiness.max
-      );
+      // Adjust sass level based on context
+      if (topicContext.mainTopic.toLowerCase().includes('roast')) {
+        currentContext.sassLevel = Math.min(
+          currentContext.sassLevel + AMAT_PERSONALITY.sassiness.increment * 2,
+          AMAT_PERSONALITY.sassiness.max
+        );
+      }
     }
 
     currentContext.lastActivity = Date.now();
@@ -250,16 +255,34 @@ Response guidelines:
       const history = this.getRecentHistory(groupId);
       const latestMessage = history[history.length - 1];
       
-      // Analyze the latest message for context
-      const topicContext = await this.analyzeMessage(latestMessage.content);
+      // Handle special case for mutiara kata/words of wisdom
+      if (latestMessage.content.toLowerCase().includes('mutiara kata')) {
+        const completion = await this.openai.chat.completions.create({
+          model: "gpt-4o-mini-2024-07-18",
+          messages: [
+            {
+              role: "system",
+              content: `You are ${AMAT_PERSONALITY.core.name}, giving words of wisdom for today (Friday).
+              Mix Malay and English naturally, use modern KL youth style.
+              Make it motivational but keep it real and slightly humorous.
+              Include emojis. Keep it under 2-3 sentences.`
+            }
+          ],
+          temperature: 0.8,
+          max_tokens: 100
+        });
+
+        const response = completion.choices[0].message.content;
+        if (!response) return null;
+
+        return this.languageAgent.enhanceResponse(response, groupId);
+      }
       
-      // Update group context with new information
+      // Regular message handling
+      const topicContext = await this.analyzeMessage(latestMessage.content);
       this.updateGroupContext(groupId, topicContext);
       
-      // Get appropriate personality based on group context
       const personality = this.getGroupPersonality(groupId);
-      
-      // Generate personality-aware prompt
       const personalityPrompt = this.getPersonalityPrompt(personality, topicContext);
 
       console.log('🤖 Generating response with personality:', personality);
@@ -285,10 +308,7 @@ Response guidelines:
       const response = completion.choices[0].message.content;
       if (!response) return null;
 
-      // Enhance response with local slang and style
-      const enhancedResponse = await this.languageAgent.enhanceResponse(response, groupId);
-      
-      return enhancedResponse;
+      return this.languageAgent.enhanceResponse(response, groupId);
     } catch (error) {
       console.error('🤖 Error generating response:', error);
       return null;
